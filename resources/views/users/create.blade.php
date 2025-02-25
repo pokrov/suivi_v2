@@ -1,5 +1,10 @@
 @extends('layouts.app')
 
+@section('breadcrumb')
+    <li class="breadcrumb-item"><a href="{{ route('superadmin.users.index') }}">Utilisateurs</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Créer un utilisateur</li>
+@endsection
+
 @section('content')
 <div class="container">
     <h1>Créer un nouvel utilisateur</h1>
@@ -17,27 +22,27 @@
     <form action="{{ route('superadmin.users.store') }}" method="POST">
         @csrf
 
-        <div class="form-group">
+        <div class="form-group mb-3">
             <label for="name">Nom :</label>
             <input type="text" class="form-control" name="name" required>
         </div>
 
-        <div class="form-group">
+        <div class="form-group mb-3">
             <label for="email">Email :</label>
             <input type="email" class="form-control" name="email" required>
         </div>
 
-        <div class="form-group">
+        <div class="form-group mb-3">
             <label for="password">Mot de passe :</label>
             <input type="password" class="form-control" name="password" required>
         </div>
 
-        <div class="form-group">
+        <div class="form-group mb-3">
             <label for="password_confirmation">Confirmer le mot de passe :</label>
             <input type="password" class="form-control" name="password_confirmation" required>
         </div>
 
-        <div class="form-group">
+        <div class="form-group mb-3">
             <label for="role">Rôle :</label>
             <select name="role" class="form-control" required>
                 @foreach ($roles as $role)
@@ -46,8 +51,8 @@
             </select>
         </div>
 
-        <button type="submit" class="btn btn-success mt-3">Créer l'utilisateur</button>
-        <a href="{{ route('superadmin.users.index') }}" class="btn btn-secondary mt-3">Annuler</a>
+        <button type="submit" class="btn btn-success">Créer l'utilisateur</button>
+        <a href="{{ route('superadmin.users.index') }}" class="btn btn-secondary">Annuler</a>
     </form>
 </div>
 @endsection

@@ -1,5 +1,9 @@
 @extends('layouts.app')
 
+@section('breadcrumb')
+    <li class="breadcrumb-item active" aria-current="page">Utilisateurs</li>
+@endsection
+
 @section('content')
 <div class="container">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -61,7 +65,8 @@
                         <a href="{{ route('superadmin.users.edit', $user->id) }}" class="btn btn-sm btn-warning me-1">
                             <i class="fas fa-edit"></i> Modifier
                         </a>
-
+                        
+                        @if(!$user->hasRole('super_admin'))
                         <form action="{{ route('superadmin.users.destroy', $user->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?');">
                             @csrf
                             @method('DELETE')
@@ -69,6 +74,7 @@
                                 <i class="fas fa-trash-alt"></i> Supprimer
                             </button>
                         </form>
+                        @endif
                     </td>
                 </tr>
                 @empty

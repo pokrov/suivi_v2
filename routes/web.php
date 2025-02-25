@@ -4,45 +4,76 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SuperAdminDashboardController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\RoleController;
-
-
-/*
-|--------------------------------------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "web" middleware group. Make something great!
-|
-*/
-
-Route::get('/', function () {
-    return view('welcome');
-});
+use App\Http\Controllers\GrandProjetCPCController;
+use App\Http\Controllers\GrandProjetCLMController;
 
 Auth::routes();
 
-Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
+// 🌐 Redirection de la racine vers la page de connexion
+Route::get('/', fn() => redirect()->route('login'));
 
-Route::middleware(['auth', 'role:super_admin'])->prefix('superadmin')->name('superadmin.')->group(function () {
-    Route::get('/dashboard', [SuperAdminDashboardController::class, 'index'])->name('dashboard');
+// 🏠 Redirection après connexion selon le rôle de l'utilisateur
+Route::get('/home', function () {
+    if (Auth::check()) {
+        return match(true) {
+            Auth::user()->hasRole('super_admin') => redirect()->route('superadmin.dashboard'),
+            Auth::user()->hasRole('chef') => redirect()->route('chef.dashboard'),
+            Auth::user()->hasRole('saisie_petit') => redirect()->route('saisie.dashboard'),
+            default => redirect()->route('login'),
+        };
+    }
+    return redirect()->route('login');
+})->name('home');
 
-    Route::get('/users', [UserController::class, 'index'])->name('users.index');
-    Route::get('/users/create', [UserController::class, 'create'])->name('users.create'); // Formulaire de création
-    Route::post('/users', [UserController::class, 'store'])->name('users.store');         // Traitement du formulaire
+/* -----------------------------------
+  🛡️ Routes Super Administrateur
+----------------------------------- */
+Route::middleware(['auth', 'role:super_admin'])
+    ->prefix('superadmin')
+    ->name('superadmin.')
+    ->group(function () {
+        Route::get('/dashboard', [SuperAdminDashboardController::class, 'index'])->name('dashboard');
+        Route::resource('users', UserController::class);
+        Route::prefix('roles')->name('roles.')->group(function () {
+            Route::get('/', [RoleController::class, 'index'])->name('index');
+            Route::get('/create', [RoleController::class, 'create'])->name('create');
+            Route::post('/', [RoleController::class, 'store'])->name('store');
+            Route::delete('/{role}', [RoleController::class, 'destroy'])->name('destroy');
+        });
+    });
 
-    Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
-    Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
-    Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
-    Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
+/* -----------------------------------
+  📊 Routes pour le Chef
+----------------------------------- */
+/* -----------------------------------
+  📊 Routes pour le Chef
+----------------------------------- */
+Route::middleware(['auth', 'role:chef'])
+    ->prefix('chef')
+    ->name('chef.')
+    ->group(function () {
+        // Dashboard du chef
+        Route::get('/dashboard', fn() => view('chef.dashboard'))->name('dashboard');
 
-});
+        // Suppress or remove this block if you want custom parameters:
+        // Route::prefix('grandprojets')->name('grandprojets.')->group(function () {
+        //     Route::resource('cpc', GrandProjetCPCController::class);
+        //     Route::resource('clm', GrandProjetCLMController::class);
+        // });
 
-Route::middleware(['auth', 'role:super_admin'])->prefix('superadmin')->name('superadmin.')->group(function () {
-    // Gestion des rôles
-    Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');      // Liste des rôles
-    Route::get('/roles/create', [RoleController::class, 'create'])->name('roles.create'); // Formulaire de création
-    Route::post('/roles', [RoleController::class, 'store'])->name('roles.store');     // Enregistrement
-    Route::delete('/roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy'); // Suppression
-});
+        Route::get('/statistiques', fn() => view('chef.statistiques'))->name('statistiques');
+    });
+
+
+/* -----------------------------------
+  ✅ Keep only this block for custom parameter {grandProjet}
+----------------------------------- */
+Route::middleware(['auth', 'role:chef'])
+    ->prefix('chef/grandprojets')
+    ->name('chef.grandprojets.')
+    ->group(function () {
+        Route::resource('cpc', GrandProjetCPCController::class)->parameters([
+            'cpc' => 'grandProjet'
+        ]);
+        Route::resource('clm', GrandProjetCLMController::class);
+    });
