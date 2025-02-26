@@ -1,3 +1,4 @@
+{{-- resources/views/grandprojets/cpc/create.blade.php --}}
 @extends('layouts.app')
 
 @section('content')
@@ -17,16 +18,26 @@
         </div>
       @endif
 
-      <form action="{{ route('chef.grandprojets.cpc.store') }}" method="POST">
+      {{-- Depending on the user role, we use different route actions --}}
+      @if(Auth::user()->hasRole('chef'))
+          <form action="{{ route('chef.grandprojets.cpc.store') }}" method="POST">
+      @elseif(Auth::user()->hasRole('saisie_cpc'))
+          <form action="{{ route('saisie_cpc.cpc.store') }}" method="POST">
+      @endif
+
         @csrf
+
         <div class="row">
           <!-- Colonne gauche : Identification & Localisation -->
           <div class="col-md-6">
             <h5 class="mb-3 text-secondary border-bottom pb-2">Identification & Localisation</h5>
+            
             <div class="mb-3">
               <label class="form-label">Numéro de Dossier</label>
-              <input type="text" name="numero_dossier" class="form-control" placeholder="ex: 1234/2023" required>
+              <input type="text" name="numero_dossier"
+                     class="form-control" placeholder="ex: 1234/2023" required>
             </div>
+
             <div class="mb-3">
               <label class="form-label">Province/Préfecture</label>
               <select name="province" class="form-control" required>
@@ -37,6 +48,7 @@
                 <option value="Province Figuig">Province Figuig</option>
               </select>
             </div>
+
             <div class="mb-3">
               <label class="form-label">Commune 1</label>
               <select name="commune_1" class="form-control" required>
@@ -46,6 +58,7 @@
                 <option value="Commune C">Commune C</option>
               </select>
             </div>
+
             <div class="mb-3">
               <label class="form-label">Commune 2 (Optionnel)</label>
               <select name="commune_2" class="form-control">
@@ -54,6 +67,7 @@
                 <option value="Commune B">Commune B</option>
               </select>
             </div>
+
             <div class="mb-3">
               <label class="form-label">Type d'envoi</label>
               <select name="type_envoi" class="form-control" id="type_envoi">
@@ -62,16 +76,19 @@
                 <option value="email">Email</option>
               </select>
             </div>
+
             <div id="envoi_details" class="mb-3 d-none">
               <label class="form-label">Référence d'Envoi</label>
               <input type="text" name="reference_envoi" class="form-control">
               <label class="form-label mt-2">Numéro d'Envoi</label>
               <input type="text" name="numero_envoi" class="form-control">
             </div>
+
             <div class="mb-3">
               <label class="form-label">Date d'Arrivée</label>
               <input type="date" name="date_arrivee" class="form-control" required>
             </div>
+
             <div class="mb-3">
               <label class="form-label">Date de Commission Interne</label>
               <input type="date" name="date_commission_interne" class="form-control">
@@ -81,18 +98,22 @@
           <!-- Colonne droite : Informations du Projet -->
           <div class="col-md-6">
             <h5 class="mb-3 text-secondary border-bottom pb-2">Informations du Projet</h5>
+
             <div class="mb-3">
               <label class="form-label">Pétitionnaire</label>
               <input type="text" name="petitionnaire" class="form-control" required>
             </div>
+
             <div class="mb-3 form-check">
               <input type="checkbox" class="form-check-input" id="has_proprietaire">
               <label class="form-check-label" for="has_proprietaire">Indiquer le Propriétaire</label>
             </div>
+
             <div class="mb-3 d-none" id="proprietaire_div">
               <label class="form-label">Propriétaire</label>
               <input type="text" name="proprietaire" class="form-control">
             </div>
+
             <div class="mb-3">
               <label class="form-label">Catégorie du Pétitionnaire</label>
               <select name="categorie_petitionnaire" class="form-control" required>
@@ -102,21 +123,25 @@
                 <option value="Collectivité">Collectivité</option>
               </select>
             </div>
+
             <div class="mb-3">
               <label class="form-label">Intitulé du Projet</label>
               <input type="text" name="intitule_projet" class="form-control" required>
             </div>
+
             <div class="mb-3">
               <label class="form-label">Lien vers la GED</label>
               <input type="url" name="lien_ged" class="form-control">
             </div>
+
             <div class="mb-3">
               <label class="form-label">Catégorie du Projet</label>
               <select name="categorie_projet" class="form-control" required>
                 <option value="">Sélectionner la catégorie</option>
-                <option value="CPC">CPC (Projet de Construction)</option>
+                <option value="CPC" selected>CPC (Projet de Construction)</option>
               </select>
             </div>
+
             <div class="mb-3">
               <label class="form-label">Contexte du Projet</label>
               <select name="contexte_projet" class="form-control" required>
@@ -126,6 +151,7 @@
                 <option value="Extension">Extension</option>
               </select>
             </div>
+
             <div class="mb-3">
               <label class="form-label">Maître d'Œuvre</label>
               <select name="maitre_oeuvre" class="form-control" required>
@@ -134,14 +160,18 @@
                 <option value="Entreprise B">Entreprise B</option>
               </select>
             </div>
+
             <div class="mb-3">
               <label class="form-label">Situation (Adresse)</label>
               <textarea name="situation" class="form-control" rows="2" required></textarea>
             </div>
+
             <div class="mb-3">
               <label class="form-label">Références Foncières</label>
-              <input type="text" name="reference_fonciere" class="form-control" placeholder="ex: 12345/A/2024" required>
+              <input type="text" name="reference_fonciere" class="form-control"
+                     placeholder="ex: 12345/A/2024" required>
             </div>
+
             <div class="mb-3">
               <label class="form-label">Observations</label>
               <textarea name="observations" class="form-control" rows="3"></textarea>
@@ -151,7 +181,13 @@
 
         <div class="d-flex justify-content-end">
           <button type="submit" class="btn btn-success me-2">Enregistrer le Projet</button>
-          <a href="{{ route('chef.grandprojets.cpc.index') }}" class="btn btn-secondary">Annuler</a>
+
+          {{-- Annuler link depends on role --}}
+          @if(Auth::user()->hasRole('chef'))
+            <a href="{{ route('chef.grandprojets.cpc.index') }}" class="btn btn-secondary">Annuler</a>
+          @elseif(Auth::user()->hasRole('saisie_cpc'))
+            <a href="{{ route('saisie_cpc.dashboard') }}" class="btn btn-secondary">Annuler</a>
+          @endif
         </div>
       </form>
     </div>
@@ -159,12 +195,12 @@
 </div>
 
 <script>
-  // Affiche/Masque le champ Propriétaire
+  // Toggle Propriétaire field
   document.getElementById('has_proprietaire').addEventListener('change', function() {
     document.getElementById('proprietaire_div').classList.toggle('d-none', !this.checked);
   });
 
-  // Affiche/Masque les champs d'envoi si le type est "papier"
+  // Toggle Envoi details if "papier"
   document.getElementById('type_envoi').addEventListener('change', function() {
     document.getElementById('envoi_details').classList.toggle('d-none', this.value !== 'papier');
   });

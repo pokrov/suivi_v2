@@ -7,14 +7,25 @@
       <h2 class="mb-0">
         <i class="fas fa-info-circle"></i> Détails du Grand Projet - CPC
       </h2>
-      <a href="{{ route('chef.grandprojets.cpc.index') }}" class="btn btn-secondary">
-        <i class="fas fa-arrow-left"></i> Retour à la liste
-      </a>
+
+      {{-- The "back" link depends on the user role --}}
+      @if(Auth::user()->hasRole('chef'))
+        <a href="{{ route('chef.grandprojets.cpc.index') }}" class="btn btn-secondary">
+          <i class="fas fa-arrow-left"></i> Retour à la liste (Chef)
+        </a>
+      @elseif(Auth::user()->hasRole('saisie_cpc'))
+        <a href="{{ route('saisie_cpc.dashboard') }}" class="btn btn-secondary">
+          <i class="fas fa-arrow-left"></i> Retour au Dashboard (Saisie CPC)
+        </a>
+      @else
+        {{-- Fallback if some other role/user accesses --}}
+        <a href="#" class="btn btn-secondary">Retour</a>
+      @endif
     </div>
 
     <div class="card-body">
       <div class="row">
-        {{-- Left column: Identification & Localisation --}}
+        {{-- LEFT COLUMN --}}
         <div class="col-md-6">
           <h5 class="text-primary border-bottom pb-2 mb-3">
             <i class="fas fa-map-marker-alt"></i> Identification & Localisation
@@ -22,49 +33,37 @@
 
           <ul class="list-group mb-4">
             <li class="list-group-item">
-              <strong>Numéro de Dossier :</strong> 
-              {{ $cpc->numero_dossier }}
+              <strong>Numéro de Dossier :</strong> {{ $cpc->numero_dossier }}
             </li>
             <li class="list-group-item">
-              <strong>Province/Préfecture :</strong> 
-              {{ $cpc->province }}
+              <strong>Province/Préfecture :</strong> {{ $cpc->province }}
             </li>
             <li class="list-group-item">
-              <strong>Commune 1 :</strong> 
-              {{ $cpc->commune_1 }}
+              <strong>Commune 1 :</strong> {{ $cpc->commune_1 }}
             </li>
             @if($cpc->commune_2)
-            <li class="list-group-item">
-              <strong>Commune 2 :</strong> 
-              {{ $cpc->commune_2 }}
-            </li>
-            @endif
-            
-            <li class="list-group-item">
-    <strong>Date d'Arrivée :</strong>
-    @if($cpc->date_arrivee)
-        {{ \Carbon\Carbon::parse($cpc->date_arrivee)->format('d/m/Y') }}
-    @else
-        Non définie
-    @endif
-</li>
-            @if($cpc->date_commission_interne)
-            <li class="list-group-item">
-              <strong>Date de Commission :</strong> 
               <li class="list-group-item">
-    <strong>Date d'Arrivée :</strong>
-    @if($cpc->date_arrivee)
-        {{ \Carbon\Carbon::parse($cpc->date_commission_interne)->format('d/m/Y') }}
-    @else
-        Non définie
-    @endif
-</li>
+                <strong>Commune 2 :</strong> {{ $cpc->commune_2 }}
+              </li>
+            @endif
+            <li class="list-group-item">
+              <strong>Date d'Arrivée :</strong>
+              @if($cpc->date_arrivee)
+                {{ \Carbon\Carbon::parse($cpc->date_arrivee)->format('d/m/Y') }}
+              @else
+                Non définie
+              @endif
             </li>
+            @if($cpc->date_commission_interne)
+              <li class="list-group-item">
+                <strong>Date de Commission :</strong>
+                {{ \Carbon\Carbon::parse($cpc->date_commission_interne)->format('d/m/Y') }}
+              </li>
             @endif
           </ul>
         </div>
 
-        {{-- Right column: Informations du Projet --}}
+        {{-- RIGHT COLUMN --}}
         <div class="col-md-6">
           <h5 class="text-primary border-bottom pb-2 mb-3">
             <i class="fas fa-info"></i> Informations du Projet
@@ -72,63 +71,57 @@
 
           <ul class="list-group mb-4">
             <li class="list-group-item">
-              <strong>Pétitionnaire :</strong> 
-              {{ $cpc->petitionnaire }}
+              <strong>Pétitionnaire :</strong> {{ $cpc->petitionnaire }}
             </li>
             <li class="list-group-item">
-              <strong>Catégorie du Pétitionnaire :</strong> 
-              {{ $cpc->categorie_petitionnaire }}
+              <strong>Catégorie du Pétitionnaire :</strong> {{ $cpc->categorie_petitionnaire }}
             </li>
             <li class="list-group-item">
-              <strong>Intitulé du Projet :</strong> 
-              {{ $cpc->intitule_projet }}
+              <strong>Intitulé du Projet :</strong> {{ $cpc->intitule_projet }}
             </li>
             <li class="list-group-item">
-              <strong>Catégorie du Projet :</strong> 
-              {{ $cpc->categorie_projet }}
+              <strong>Catégorie du Projet :</strong> {{ $cpc->categorie_projet }}
             </li>
             <li class="list-group-item">
-              <strong>Contexte du Projet :</strong> 
-              {{ $cpc->contexte_projet }}
+              <strong>Contexte du Projet :</strong> {{ $cpc->contexte_projet }}
             </li>
             <li class="list-group-item">
-              <strong>Maître d'Œuvre :</strong> 
-              {{ $cpc->maitre_oeuvre }}
+              <strong>Maître d'Œuvre :</strong> {{ $cpc->maitre_oeuvre }}
             </li>
             <li class="list-group-item">
-              <strong>Situation :</strong> 
-              {{ $cpc->situation }}
+              <strong>Situation :</strong> {{ $cpc->situation }}
             </li>
             <li class="list-group-item">
-              <strong>Références Foncières :</strong> 
-              {{ $cpc->reference_fonciere }}
+              <strong>Références Foncières :</strong> {{ $cpc->reference_fonciere }}
             </li>
             @if($cpc->observations)
-            <li class="list-group-item">
-              <strong>Observations :</strong> 
-              {{ $cpc->observations }}
-            </li>
+              <li class="list-group-item">
+                <strong>Observations :</strong> {{ $cpc->observations }}
+              </li>
             @endif
           </ul>
         </div>
       </div>
 
-      {{-- Buttons: Edit + Delete --}}
-      <div class="d-flex justify-content-between">
-        <a href="{{ route('chef.grandprojets.cpc.edit', $cpc) }}" class="btn btn-warning">
-          <i class="fas fa-edit"></i> Modifier
-        </a>
-        <form action="{{ route('chef.grandprojets.cpc.destroy', $cpc) }}" 
-              method="POST" 
-              onsubmit="return confirm('Supprimer ce projet ?');">
-          @csrf
-          @method('DELETE')
-          <button type="submit" class="btn btn-danger">
-            <i class="fas fa-trash"></i> Supprimer
-          </button>
-        </form>
-      </div>
-
+      {{-- ACTION BUTTONS: Only Chef can Edit/Delete --}}
+      @if(Auth::user()->hasRole('chef'))
+        <div class="d-flex justify-content-between">
+          {{-- Edit button --}}
+          <a href="{{ route('chef.grandprojets.cpc.edit', $cpc) }}" class="btn btn-warning">
+            <i class="fas fa-edit"></i> Modifier
+          </a>
+          {{-- Delete form --}}
+          <form action="{{ route('chef.grandprojets.cpc.destroy', $cpc) }}"
+                method="POST"
+                onsubmit="return confirm('Supprimer ce projet ?');">
+            @csrf
+            @method('DELETE')
+            <button type="submit" class="btn btn-danger">
+              <i class="fas fa-trash"></i> Supprimer
+            </button>
+          </form>
+        </div>
+      @endif
     </div>
   </div>
 </div>

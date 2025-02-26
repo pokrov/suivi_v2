@@ -9,12 +9,13 @@ use Illuminate\Support\Facades\Auth;
 class GrandProjetCPCController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * Index: Chef only (full resource route).
      */
     public function index()
     {
-        // Récupère uniquement les projets de catégorie 'CPC'
+        // Chef can list all CPC. Also eager-load the user who created each project.
         $grandProjets = GrandProjet::where('categorie_projet', 'CPC')
+            ->with('user')
             ->latest()
             ->paginate(10);
 
@@ -22,7 +23,7 @@ class GrandProjetCPCController extends Controller
     }
 
     /**
-     * Show the form for creating a new resource.
+     * Create form: Accessed by both Chef & saisie_cpc (partial route for saisie_cpc).
      */
     public function create()
     {
@@ -30,7 +31,7 @@ class GrandProjetCPCController extends Controller
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Store: Shared by Chef & saisie_cpc.
      */
     public function store(Request $request)
     {
@@ -47,6 +48,7 @@ class GrandProjetCPCController extends Controller
             'maitre_oeuvre'           => 'required|string',
             'situation'               => 'required|string',
             'reference_fonciere'      => 'required|string',
+
             // Optionals
             'reference_envoi'         => 'nullable|string',
             'numero_envoi'            => 'nullable|string',
@@ -57,42 +59,53 @@ class GrandProjetCPCController extends Controller
             'proprietaire'            => 'nullable|string',
         ]);
 
-        // Forcer le type_projet = 'cpc'
+        // Force the type_projet to "cpc"
         $validated['type_projet'] = 'cpc';
+        // Associate the currently logged in user
         $validated['user_id'] = Auth::id();
 
         GrandProjet::create($validated);
 
-        return redirect()
-            ->route('chef.grandprojets.cpc.index')
-            ->with('success', 'Projet CPC enregistré avec succès.');
+        // Redirect based on user role
+        if (Auth::user()->hasRole('chef')) {
+            return redirect()
+                ->route('chef.grandprojets.cpc.index')
+                ->with('success', 'Projet CPC enregistré avec succès (Chef).');
+        } elseif (Auth::user()->hasRole('saisie_cpc')) {
+            return redirect()
+                ->route('saisie_cpc.dashboard')
+                ->with('success', 'Projet CPC enregistré avec succès (Saisie CPC).');
+        }
+
+        // Fallback (should not happen with your role-based routes)
+        return redirect()->route('login');
     }
 
     /**
-     * Display the specified resource.
+     * Show: Both Chef & saisie_cpc can see details of a CPC.
      */
     public function show(GrandProjet $grandProjet)
-{
-    // Provide $cpc to the view
-    return view('grandprojets.cpc.show', [
-        'cpc' => $grandProjet
-    ]);
-}
+    {
+        return view('grandprojets.cpc.show', [
+            'cpc' => $grandProjet
+        ]);
+    }
 
     /**
-     * Show the form for editing the specified resource.
+     * Edit: Chef only.
      */
     public function edit(GrandProjet $grandProjet)
     {
-        // Blade will receive the variable $grandProjet
+        // Only Chef route calls this
         return view('grandprojets.cpc.edit', compact('grandProjet'));
     }
 
     /**
-     * Update the specified resource in storage.
+     * Update: Chef only.
      */
     public function update(Request $request, GrandProjet $grandProjet)
     {
+        // Chef only
         $validated = $request->validate([
             'numero_dossier'          => 'required|string',
             'province'                => 'required|string',
@@ -124,10 +137,11 @@ class GrandProjetCPCController extends Controller
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Destroy: Chef only.
      */
     public function destroy(GrandProjet $grandProjet)
     {
+        // Chef only
         $grandProjet->delete();
 
         return redirect()

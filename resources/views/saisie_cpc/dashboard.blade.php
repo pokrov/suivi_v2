@@ -1,16 +1,16 @@
-{{-- resources/views/grandprojets/cpc/index.blade.php --}}
 @extends('layouts.app')
 
 @section('content')
 <div class="container">
-    <h2 class="mb-4 text-center">Liste des Projets CPC (Chef)</h2>
+    <h2 class="mb-4 text-center">Tableau de bord - Saisie CPC</h2>
 
+    {{-- Success message if any --}}
     @if(session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>
     @endif
 
-    {{-- Button to create a new CPC (Chef route) --}}
-    <a href="{{ route('chef.grandprojets.cpc.create') }}" class="btn btn-success mb-3">
+    {{-- Button to create a new CPC project --}}
+    <a href="{{ route('saisie_cpc.cpc.create') }}" class="btn btn-success mb-3">
         <i class="fas fa-plus"></i> Ajouter un projet CPC
     </a>
 
@@ -25,53 +25,28 @@
                         <th>Commune</th>
                         <th>Date d'Arrivée</th>
                         <th>État</th>
-                        <th>Saisi par</th>  <!-- NEW COLUMN -->
-                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach($grandProjets as $projet)
                     <tr class="text-center"
                         style="cursor: pointer;"
-                        onclick="window.location='{{ route('chef.grandprojets.cpc.show', $projet) }}'">
+                        onclick="window.location='{{ route('saisie_cpc.cpc.show', $projet) }}'">
                         <td>{{ $loop->iteration }}</td>
                         <td>{{ $projet->numero_dossier }}</td>
                         <td>{{ $projet->intitule_projet }}</td>
                         <td>{{ $projet->commune_1 }}</td>
                         <td>
-                            {{ $projet->date_arrivee
-                                ? \Carbon\Carbon::parse($projet->date_arrivee)->format('d/m/Y')
+                            {{ $projet->date_arrivee 
+                                ? \Carbon\Carbon::parse($projet->date_arrivee)->format('d/m/Y') 
                                 : 'Non définie'
                             }}
                         </td>
                         <td>
-                            <span class="badge bg-{{ $projet->etat === 'favorable' 
-                                ? 'success'
+                            <span class="badge bg-{{ $projet->etat === 'favorable' ? 'success' 
                                 : ($projet->etat === 'defavorable' ? 'danger' : 'secondary') }}">
                                 {{ ucfirst($projet->etat) }}
                             </span>
-                        </td>
-
-                        <td>
-                            {{-- If user is not null, display name --}}
-                            {{ $projet->user ? $projet->user->name : 'N/A' }}
-                        </td>
-
-                        <td>
-                            {{-- Edit button --}}
-                            <a href="{{ route('chef.grandprojets.cpc.edit', $projet) }}"
-                               class="btn btn-warning btn-sm">
-                                Modifier
-                            </a>
-
-                            {{-- Delete form --}}
-                            <form action="{{ route('chef.grandprojets.cpc.destroy', $projet) }}"
-                                  method="POST"
-                                  class="d-inline"
-                                  onsubmit="return confirm('Supprimer ce projet ?');">
-                                @csrf
-                              
-                            </form>
                         </td>
                     </tr>
                     @endforeach
@@ -79,7 +54,7 @@
             </table>
         </div>
 
-        {{-- Pagination --}}
+        {{-- Pagination links if needed --}}
         <div class="d-flex justify-content-center">
             {{ $grandProjets->links() }}
         </div>
