@@ -110,29 +110,75 @@ Route::middleware(['auth', 'role:chef'])
 | to create or show a CPC project. No Edit/Update/Destroy routes are defined here.
 |
 */
+// ... Dans le bloc "SAISIE_CPC ROUTES" ...
 Route::middleware(['auth', 'role:saisie_cpc'])
     ->prefix('saisie_cpc')
     ->name('saisie_cpc.')
     ->group(function () {
 
-        // Dashboard listing only CPC
+        // Dashboard
         Route::get('/dashboard', function () {
-            $grandProjets = \App\Models\GrandProjet::where('categorie_projet', 'CPC')
-                ->latest()
-                ->paginate(10);
-
+            $search = request('search');
+            $dateFrom = request('date_from');
+            $dateTo = request('date_to');
+        
+            $query = \App\Models\GrandProjet::where('type_projet', 'cpc');
+        
+            // Recherche globale sur plusieurs champs si besoin
+            if ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('numero_dossier', 'LIKE', "%{$search}%")
+                      ->orWhere('intitule_projet', 'LIKE', "%{$search}%")
+                      ->orWhere('commune_1', 'LIKE', "%{$search}%")
+                      ->orWhere('commune_2', 'LIKE', "%{$search}%")
+                      ->orWhere('etat', 'LIKE', "%{$search}%")
+                      ->orWhere('petitionnaire', 'LIKE', "%{$search}%")
+                      ->orWhere('maitre_oeuvre', 'LIKE', "%{$search}%")
+                      ->orWhere('categorie_projet', 'LIKE', "%{$search}%")
+                      ->orWhere('categorie_petitionnaire', 'LIKE', "%{$search}%")
+                      ->orWhere('situation', 'LIKE', "%{$search}%")
+                      ->orWhere('observations', 'LIKE', "%{$search}%");
+                });
+            }
+        
+            // Intervalle de dates
+            if ($dateFrom && $dateTo) {
+                // Cherche les projets dont date_arrivee est entre dateFrom et dateTo
+                $query->whereBetween('date_arrivee', [$dateFrom, $dateTo]);
+            } elseif ($dateFrom) {
+                // date_arrivee >= dateFrom
+                $query->where('date_arrivee', '>=', $dateFrom);
+            } elseif ($dateTo) {
+                // date_arrivee <= dateTo
+                $query->where('date_arrivee', '<=', $dateTo);
+            }
+        
+            // Pagination
+            $grandProjets = $query->latest()->paginate(10);
+        
             return view('saisie_cpc.dashboard', compact('grandProjets'));
         })->name('dashboard');
+        
+        
+        
+        
 
-        // Create form
-        Route::get('/cpc/create', [GrandProjetCPCController::class, 'create'])
-            ->name('cpc.create');
+        // Create + Store
+        Route::get('/cpc/create', [GrandProjetCPCController::class, 'create'])->name('cpc.create');
+        Route::post('/cpc', [GrandProjetCPCController::class, 'store'])->name('cpc.store');
 
-        // Store action
-        Route::post('/cpc', [GrandProjetCPCController::class, 'store'])
-            ->name('cpc.store');
+        // Show
+        Route::get('/cpc/{grandProjet}', [GrandProjetCPCController::class, 'show'])->name('cpc.show');
 
-        // Show detail
-        Route::get('/cpc/{grandProjet}', [GrandProjetCPCController::class, 'show'])
-            ->name('cpc.show');
+        // *** NOUVELLES ROUTES ***
+        // Edit
+        Route::get('/cpc/{grandProjet}/edit', [GrandProjetCPCController::class, 'edit'])
+            ->name('cpc.edit');
+
+        // Update
+        Route::put('/cpc/{grandProjet}', [GrandProjetCPCController::class, 'update'])
+            ->name('cpc.update');
+
+        // (Pas de destroy si tu ne veux pas la suppression)
     });
+

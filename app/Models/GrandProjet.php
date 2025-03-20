@@ -61,4 +61,9 @@ class GrandProjet extends Model
     {
         return $query->where('type_projet', 'clm');
     }
+    public function isAtStage($stage)
+{
+    return $this->etat === $stage;
+}
+
 }
