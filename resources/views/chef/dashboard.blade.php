@@ -42,7 +42,7 @@
                     <i class="fas fa-chart-line fa-3x text-warning mb-3"></i>
                     <h5 class="card-title">Statistiques</h5>
                     <p class="card-text">Visualisez les rapports et indicateurs clés.</p>
-                    <a href="" class="btn btn-warning">Accéder</a>
+                    <a href="{{ route('chef.stats.index') }}" class="btn btn-warning">Accéder</a>
                 </div>
             </div>
         </div>

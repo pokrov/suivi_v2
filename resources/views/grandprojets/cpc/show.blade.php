@@ -24,6 +24,32 @@
     </div>
 
     <div class="card-body">
+      {{-- Tracker d’étapes --}}
+@include('components.tracker', ['etatCourant' => $cpc->etat])
+
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          @if($cpc->isFavorable())
+            <span class="badge bg-success">Favorable</span>
+          @else
+            <span class="badge bg-warning text-dark">En instruction — état: {{ $cpc->etat }}</span>
+          @endif
+        </div>
+
+        {{-- Bouton pour rendre l’avis uniquement si le projet est à la commission interne et pas encore favorable --}}
+        @if($cpc->etat === 'comm_interne' && !$cpc->isFavorable())
+          @if(Auth::user()->hasRole('chef'))
+            <a class="btn btn-primary btn-sm" href="{{ route('chef.grandprojets.cpc.examens.create', $cpc) }}">
+              Rendre l’avis (Examen n° {{ $cpc->next_numero_examen }})
+            </a>
+          @else
+            <a class="btn btn-primary btn-sm" href="{{ route('saisie_cpc.cpc.examens.create', $cpc) }}">
+              Rendre l’avis (Examen n° {{ $cpc->next_numero_examen }})
+            </a>
+          @endif
+        @endif
+      </div>
+
       <div class="row">
         {{-- LEFT COLUMN --}}
         <div class="col-md-6">

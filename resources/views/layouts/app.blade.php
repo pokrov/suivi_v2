@@ -24,86 +24,70 @@
 </head>
 <body>
     <div id="app">
-        <nav class="navbar navbar-expand-md navbar-light navbar-custom shadow-sm">
-            <div class="container">
-                <!-- Brand: Redirect based on role (for chef, redirect to chef dashboard) -->
-                @php
-                    if(Auth::check()){
-                        if(Auth::user()->hasRole('chef')){
-                            $dashboardRoute = route('chef.dashboard');
-                        } elseif(Auth::user()->hasRole('super_admin')){
-                            $dashboardRoute = route('superadmin.dashboard');
-                        } elseif(Auth::user()->hasRole('saisie_petit')){
-                            $dashboardRoute = route('saisie.dashboard'); // ou route('saisie.petitprojets.index')
-                        } else {
-                            $dashboardRoute = route('home');
-                        }
-                    } else {
-                        $dashboardRoute = url('/');
-                    }
-                @endphp
-                <a class="navbar-brand" href="{{ $dashboardRoute }}">
-                    {{ config('app.name', 'Laravel') }}
-                </a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" 
-                        data-bs-target="#navbarSupportedContent" 
-                        aria-controls="navbarSupportedContent" aria-expanded="false" 
-                        aria-label="{{ __('Toggle navigation') }}">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                
-                <div class="collapse navbar-collapse" id="navbarSupportedContent">
-                    <!-- Left Side Of Navbar -->
-                    <ul class="navbar-nav me-auto">
-                        @auth
-                            @if(Auth::user()->hasRole('chef'))
-                                <li class="nav-item">
-                                    <a class="nav-link" href="">Grand Projet</a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" href="">Petit Projet</a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" href="">Statistiques</a>
-                                </li>
-                            @endif
-                        @endauth
-                    </ul>
-                    
-                    <!-- Right Side Of Navbar -->
-                    <ul class="navbar-nav ms-auto">
-                        @guest
-                            @if (Route::has('login'))
-                                <li class="nav-item">
-                                    <a class="nav-link" href="{{ route('login') }}">{{ __('Login') }}</a>
-                                </li>
-                            @endif
-                            @if (Route::has('register'))
-                                <li class="nav-item">
-                                    <a class="nav-link" href="{{ route('register') }}">{{ __('Register') }}</a>
-                                </li>
-                            @endif
-                        @else
-                            <li class="nav-item dropdown">
-                                <a id="navbarDropdown" class="nav-link dropdown-toggle" href="javascript:void(0);" role="button" 
-                                   data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" v-pre>
-                                    {{ Auth::user()->name }}
-                                </a>
-                                <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
-                                    <a class="dropdown-item" href="{{ route('logout') }}"
-                                       onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
-                                        {{ __('Logout') }}
-                                    </a>
-                                    <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
-                                        @csrf
-                                    </form>
-                                </div>
-                            </li>
-                        @endguest
-                    </ul>
-                </div>
-            </div>
-        </nav>
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+  <div class="container">
+    <a class="navbar-brand fw-bold" href="{{ route('home') }}">SUVI</a>
+
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="mainNav">
+      <ul class="navbar-nav me-auto">
+        @auth
+          <li class="nav-item">
+            <a class="nav-link {{ request()->is('chef*') ? 'active' : '' }}" href="{{ route('chef.dashboard') }}">
+              Grand Projets
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {{ request()->is('saisie_cpc*') ? 'active' : '' }}" href="{{ route('saisie_cpc.dashboard') }}">
+              Saisie CPC
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {{ request()->is('dajf*') ? 'active' : '' }}" href="{{ route('dajf.dashboard') }}">
+              DAJF
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {{ request()->is('dgu*') ? 'active' : '' }}" href="{{ route('dgu.dashboard') }}">
+              DGU
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {{ request()->is('comm*') ? 'active' : '' }}" href="{{ route('comm.dashboard') }}">
+              Commission
+            </a>
+          </li>
+        @endauth
+      </ul>
+
+      <ul class="navbar-nav ms-auto">
+        @guest
+          <li class="nav-item">
+            <a class="nav-link" href="{{ route('login') }}">Connexion</a>
+          </li>
+        @else
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+              {{ Auth::user()->name }}
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li>
+                <form method="POST" action="{{ route('logout') }}">
+                  @csrf
+                  <button type="submit" class="dropdown-item">Se déconnecter</button>
+                </form>
+              </li>
+            </ul>
+          </li>
+        @endguest
+      </ul>
+    </div>
+  </div>
+</nav>
+
         
         <main class="py-4">
             @yield('content')

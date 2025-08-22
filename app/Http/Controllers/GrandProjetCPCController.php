@@ -130,11 +130,22 @@ class GrandProjetCPCController extends Controller
      * Show: Both Chef & saisie_cpc can see details of a CPC.
      */
     public function show(GrandProjet $grandProjet)
-    {
-        return view('grandprojets.cpc.show', [
-            'cpc' => $grandProjet
-        ]);
-    }
+{
+    $grandProjet->load([
+        'user',
+        'examens.auteur',
+        'fluxEtapes.auteur',
+    ]);
+
+    $allowedTransitions = $grandProjet->allowedTransitions();
+
+    return view('grandprojets.cpc.show', [
+        'cpc' => $grandProjet,
+        'allowedTransitions' => $allowedTransitions,
+        'fluxHistory' => $grandProjet->fluxEtapes, // déjà trié desc
+    ]);
+}
+
 
     /**
      * Edit: Chef only.
@@ -208,14 +219,34 @@ class GrandProjetCPCController extends Controller
     }
 
     public function changerEtat(Request $request, GrandProjet $grandProjet)
-    {
-        $request->validate([
-            'etat' => 'required|in:transmis_dajf,recu_dajf,transmis_dgu,recu_dgu,comm_interne,retour_dgu,retour_bs,archive',
+{
+    $request->validate([
+        'etat' => 'required|string',
+        'note' => 'nullable|string',
+    ]);
+
+    $to = $request->etat;
+    $allowed = $grandProjet->allowedTransitions();
+    abort_unless(in_array($to, $allowed, true), 422, 'Transition non autorisée depuis l’état courant.');
+
+    $from = $grandProjet->etat;
+
+    \DB::transaction(function () use ($grandProjet, $from, $to, $request) {
+        // 1) Update état
+        $grandProjet->update(['etat' => $to]);
+
+        // 2) Journal (navette)
+        \App\Models\FluxEtape::create([
+            'grand_projet_id' => $grandProjet->id,
+            'from_etat'       => $from,
+            'to_etat'         => $to,
+            'happened_at'     => now(),
+            'by_user'         => auth()->id(),
+            'note'            => $request->note,
         ]);
+    });
 
-        $grandProjet->update(['etat' => $request->etat]);
-
-        return redirect()->back()->with('success', "L'état du projet a été mis à jour !");
-    }
+    return back()->with('success', "État mis à jour : {$from} → {$to}");
+}
 
 }
