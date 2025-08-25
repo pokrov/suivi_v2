@@ -1,5 +1,6 @@
 <?php
 
+// app/Models/MaitreOeuvre.php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -9,7 +10,9 @@ class MaitreOeuvre extends Model
 {
     use HasFactory;
 
-    protected $table = 'maitre_oeuvres'; // Nom de la table
+    protected $table = 'maitre_oeuvres';
 
-    protected $fillable = ['nom']; // Champs autorisés en mass assignment
+    protected $fillable = [
+        'nom', 'email', 'telephone', 'adresse',
+    ];
 }

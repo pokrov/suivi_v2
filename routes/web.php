@@ -98,6 +98,8 @@ Route::middleware(['auth', 'role:super_admin'])
         Route::get('/dashboard', [SuperAdminDashboardController::class, 'index'])->name('dashboard');
 
         Route::resource('users', UserController::class);
+        Route::resource('maitres-oeuvre', \App\Http\Controllers\MaitreOeuvreController::class);
+
 
         Route::prefix('roles')->name('roles.')->group(function () {
             Route::get('/',  [RoleController::class, 'index'])->name('index');
