@@ -73,9 +73,10 @@
                   @endif
 
                   {{-- Détails (route ouverte) --}}
-                  <a class="btn btn-link btn-sm" href="{{ route('cpc.show.any', $item) }}" target="_blank">
-                    Détails
-                  </a>
+                  <a class="btn btn-link btn-sm" href="{{ route('cpc.show.shared', $item) }}" target="_blank">
+    Détails
+</a>
+
                 </td>
               </tr>
               @endforeach

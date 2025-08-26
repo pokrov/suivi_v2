@@ -10,6 +10,17 @@ class FluxEtape extends Model
         'grand_projet_id', 'from_etat', 'to_etat', 'happened_at', 'by_user', 'note',
     ];
 
-    public function grandProjet() { return $this->belongsTo(GrandProjet::class); }
-    public function auteur()      { return $this->belongsTo(User::class, 'by_user'); }
+    protected $casts = [
+        'happened_at' => 'datetime',
+    ];
+
+    public function grandProjet()
+    {
+        return $this->belongsTo(GrandProjet::class);
+    }
+
+    public function auteur()
+    {
+        return $this->belongsTo(User::class, 'by_user');
+    }
 }

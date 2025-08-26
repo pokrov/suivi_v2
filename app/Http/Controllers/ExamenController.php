@@ -6,77 +6,119 @@ use App\Models\GrandProjet;
 use App\Models\Examen;
 use App\Models\FluxEtape;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class ExamenController extends Controller
 {
+    /**
+     * Formulaire d'avis (commission interne).
+     */
     public function create(GrandProjet $grandProjet)
     {
-        // On ne rend un avis que si le dossier est à la Commission interne
-        abort_unless($grandProjet->etat === 'comm_interne', 403, 'Le dossier n’est pas en Commission interne.');
+        // Sécurité : seuls les dossiers à la commission interne sont traitables ici
+        abort_unless($grandProjet->etat === 'comm_interne', 403, 'Dossier non à la commission interne.');
 
-        // Si déjà favorable, on bloque
-        abort_if($grandProjet->isFavorable(), 403, 'Dossier déjà favorable.');
+        // N° d’examen proposé (calcul côté serveur)
+        $nextNumero = $grandProjet->next_numero_examen;
 
         return view('examens.create', [
-            'grandprojet' => $grandProjet->load('examens.auteur'),
-            'nextNumero'  => $grandProjet->next_numero_examen,
-            'history'     => $grandProjet->examens,
+            'grandProjet' => $grandProjet,
+            'nextNumero'  => $nextNumero,
         ]);
     }
 
+    /**
+     * Enregistre un avis de commission interne.
+     * - Calcule numero_examen côté serveur
+     * - Enregistre l'examen
+     * - Redirige le dossier: defavorable -> retour_dgu ; sinon -> retour_bs
+     * - Journalise la transition
+     */
     public function store(Request $request, GrandProjet $grandProjet)
     {
-        abort_unless($grandProjet->etat === 'comm_interne', 403, 'Le dossier n’est pas en Commission interne.');
-        abort_if($grandProjet->isFavorable(), 403, 'Dossier déjà favorable.');
+        abort_unless($grandProjet->etat === 'comm_interne', 403, 'Dossier non à la commission interne.');
 
         $data = $request->validate([
-            'date_commission' => ['nullable','date'],
-            'avis'            => ['required','in:favorable,defavorable,ajourne,sans_avis'],
-            'observations'    => ['nullable','string'],
-            // vers où renvoyer le dossier après avis
-            'rediriger_vers'  => ['required','in:retour_dgu,retour_bs'],
-            'note_flux'       => ['nullable','string'],
+            'date_examen'   => ['required','date'], // on utilise date_examen
+            'avis'          => ['required','in:favorable,defavorable,ajourne,sans_avis'],
+            'observations'  => ['nullable','string'],
         ]);
 
-        DB::transaction(function () use ($grandProjet, $data) {
-            // 1) Création de l’examen (n° auto)
-            $numero = $grandProjet->next_numero_examen;
+        // Numéro d’examen calculé côté serveur (NE PAS le demander au client)
+        $numero = $grandProjet->next_numero_examen;
 
-            $grandProjet->examens()->create([
+        DB::transaction(function () use ($grandProjet, $data, $numero) {
+            // Créer l’examen (type interne)
+            Examen::create([
+                'grand_projet_id' => $grandProjet->id,
                 'numero_examen'   => $numero,
-                'date_commission' => $data['date_commission'] ?? null,
+                'type_examen'     => 'interne',              // la colonne peut exister ou non (fillable côté modèle)
+                'date_examen'     => $data['date_examen'],   // nouvelle colonne standard
+                // Si ta table a encore "date_commission", tu peux aussi la remplir:
+                'date_commission' => $data['date_examen'],
                 'avis'            => $data['avis'],
                 'observations'    => $data['observations'] ?? null,
-                'created_by'      => auth()->id(),
+                'created_by'      => Auth::id(),
             ]);
 
-            // 2) Transition d’état après commission
+            // Choisir la redirection du flux
+            $to   = $data['avis'] === 'defavorable' ? 'retour_dgu' : 'retour_bs';
             $from = $grandProjet->etat;
-            $to   = $data['rediriger_vers']; // retour_dgu ou retour_bs
 
+            // Changer l’état + journaliser
             $grandProjet->update(['etat' => $to]);
 
-            // 3) Journal (navette)
             FluxEtape::create([
                 'grand_projet_id' => $grandProjet->id,
                 'from_etat'       => $from,
                 'to_etat'         => $to,
                 'happened_at'     => now(),
-                'by_user'         => auth()->id(),
-                'note'            => $data['note_flux'] ?? null,
+                'by_user'         => Auth::id(),
+                'note'            => 'Avis commission interne (examen n° '.$numero.')',
             ]);
         });
 
-        // Redirection contextuelle
-        if (auth()->user()->hasRole('chef')) {
-            return redirect()
-                ->route('chef.grandprojets.cpc.show', $grandProjet)
-                ->with('success', 'Avis de la commission enregistré et dossier redirigé.');
-        }
+        return redirect()
+            ->route('comm.dashboard')
+            ->with('success', "Avis enregistré (examen n° {$numero}) et dossier redirigé.");
+    }
+
+    /**
+     * Formulaire d’édition d’un avis (interne).
+     */
+    public function edit(Examen $examen)
+    {
+        abort_unless($examen->type_examen === 'interne' || is_null($examen->type_examen), 403);
+
+        return view('examens.edit', [
+            'examen'      => $examen,
+            'grandProjet' => $examen->grandProjet,
+        ]);
+    }
+
+    /**
+     * Met à jour l’avis (sans repositionner le flux automatiquement).
+     */
+    public function update(Request $request, Examen $examen)
+    {
+        abort_unless($examen->type_examen === 'interne' || is_null($examen->type_examen), 403);
+
+        $data = $request->validate([
+            'date_examen'   => ['required','date'],
+            'avis'          => ['required','in:favorable,defavorable,ajourne,sans_avis'],
+            'observations'  => ['nullable','string'],
+        ]);
+
+        $examen->update([
+            'date_examen'     => $data['date_examen'],
+            'date_commission' => $data['date_examen'], // si la colonne existe toujours
+            'avis'            => $data['avis'],
+            'observations'    => $data['observations'] ?? null,
+        ]);
 
         return redirect()
-            ->route('saisie_cpc.cpc.show', $grandProjet)
-            ->with('success', 'Avis de la commission enregistré et dossier redirigé.');
+            ->route('comm.dashboard')
+            ->with('success', 'Avis modifié avec succès.');
     }
 }

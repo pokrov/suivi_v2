@@ -29,17 +29,31 @@
           <td>{{ $item->numero_dossier }}</td>
           <td>{{ $item->intitule_projet }}</td>
           <td>{{ $item->commune_1 }}</td>
-          <td><span class="badge bg-secondary">{{ $item->etat }}</span></td>
+
+          @php
+            $etat = $item->etat;
+            $badge = match($etat) {
+              'comm_interne'  => 'info',
+              'recu_dgu'      => 'primary',
+              'transmis_dgu'  => 'secondary',
+              'favorable'     => 'success',
+              'defavorable'   => 'danger',
+              default         => 'secondary'
+            };
+          @endphp
+          <td><span class="badge bg-{{ $badge }}">{{ $etat }}</span></td>
+
           <td>{{ $item->date_arrivee ? \Carbon\Carbon::parse($item->date_arrivee)->format('d/m/Y') : '-' }}</td>
           <td class="text-end">
             @if($item->etat === 'comm_interne' && !$item->isFavorable())
-              {{-- Formulaire avis (Examen n° suivant) --}}
+              {{-- Rendre l’avis (Examen n° suivant) --}}
               <a class="btn btn-success btn-sm" href="{{ route('comm.examens.create', $item) }}">
                 Rendre l’avis (Examen n° {{ $item->next_numero_examen }})
               </a>
             @endif
 
-            <a class="btn btn-link btn-sm" href="{{ route('chef.grandprojets.cpc.show', $item) }}" target="_blank">
+            {{-- Détails : utiliser la route PARTAGÉE (sinon 403) --}}
+            <a class="btn btn-link btn-sm" href="{{ route('cpc.show.shared', $item) }}" target="_blank">
               Détails
             </a>
           </td>
