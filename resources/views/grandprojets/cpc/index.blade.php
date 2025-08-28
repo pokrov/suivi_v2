@@ -1,195 +1,144 @@
-{{-- resources/views/grandprojets/cpc/index.blade.php --}}
 @extends('layouts.app')
 
 @section('content')
 <div class="container">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">CPC — Liste des dossiers</h3>
+    <a href="{{ route('chef.grandprojets.cpc.create') }}" class="btn btn-primary">
+      <i class="fas fa-plus me-1"></i> Nouveau dossier
+    </a>
+  </div>
 
-    {{-- Titre principal --}}
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="text-center mb-0">Liste des Projets CPC (Chef)</h2>
-        
-        {{-- Bouton d'ajout d'un projet CPC --}}
-        <a href="{{ route('chef.grandprojets.cpc.create') }}" class="btn btn-success">
-            <i class="fas fa-plus"></i> Ajouter un projet CPC
-        </a>
-    </div>
-    {{-- Formulaire de recherche --}}
-    <form method="GET" action="{{ route('chef.grandprojets.cpc.index') }}" class="row g-3 mb-4">
-    {{-- Champ texte global --}}
-    <div class="col-md-3">
-        <input type="text"
-               name="search"
-               class="form-control"
-               placeholder="Recherche..."
-               value="{{ request('search') }}">
-    </div>
-
-    {{-- Date de début --}}
-    <div class="col-md-2">
-        <input type="date"
-               name="date_from"
-               class="form-control"
-               placeholder="Date de début"
-               value="{{ request('date_from') }}">
-    </div>
-
-    {{-- Date de fin --}}
-    <div class="col-md-2">
-        <input type="date"
-               name="date_to"
-               class="form-control"
-               placeholder="Date de fin"
-               value="{{ request('date_to') }}">
-    </div>
-
-    {{-- Sélection de la province/préfecture --}}
-    <div class="col-md-3">
-        <select name="province" class="form-control">
-            <option value="">--Toutes les Provinces--</option>
-            <option value="Préfecture Oujda-Angad" 
-                {{ request('province') == 'Préfecture Oujda-Angad' ? 'selected' : '' }}>
-                Préfecture Oujda-Angad
-            </option>
-            <option value="Province Berkane"
-                {{ request('province') == 'Province Berkane' ? 'selected' : '' }}>
-                Province Berkane
-            </option>
-            <option value="Province Jerada"
-                {{ request('province') == 'Province Jerada' ? 'selected' : '' }}>
-                Province Jerada
-            </option>
-            <option value="Province Taourirt"
-                {{ request('province') == 'Province Taourirt' ? 'selected' : '' }}>
-                Province Taourirt
-            </option>
-            <option value="Province Figuig"
-                {{ request('province') == 'Province Figuig' ? 'selected' : '' }}>
-                Province Figuig
-            </option>
-        </select>
-    </div>
-
-    <div class="col-auto">
-        <button type="submit" class="btn btn-primary">
-            <i class="fas fa-search"></i> Rechercher
-        </button>
-    </div>
-</form>
-
-
-    {{-- Message de succès --}}
-    @if(session('success'))
-        <div class="alert alert-success">{{ session('success') }}</div>
-    @endif
-
-    {{-- Vérifie s'il y a des projets --}}
-    @if($grandProjets->count())
-        <div class="table-responsive shadow-sm">
-            <table class="table table-striped table-hover align-middle">
-                <thead class="table-dark text-center">
-                    <tr>
-                        <th>#</th>
-                        <th>Numéro de Dossier</th>
-                        <th>Intitulé du Projet</th>
-                        <th>Commune</th>
-                        <th>Date d'Arrivée</th>
-                        <th>État</th>
-                        <th>Saisi par</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($grandProjets as $projet)
-                    <tr 
-                        class="text-center"
-                        style="cursor: pointer;"
-                        onclick="window.location='{{ route('chef.grandprojets.cpc.show', $projet) }}'">
-
-                        {{-- Ordre d'itération --}}
-                        <td>{{ $loop->iteration }}</td>
-
-                        {{-- Numéro de dossier --}}
-                        <td>{{ $projet->numero_dossier }}</td>
-
-                        {{-- Intitulé du Projet --}}
-                        <td>{{ $projet->intitule_projet }}</td>
-
-                        {{-- Commune --}}
-                        <td>{{ $projet->commune_1 }}</td>
-
-                        {{-- Date d'arrivée (formatée) --}}
-                        <td>
-                            @if($projet->date_arrivee)
-                                {{ \Carbon\Carbon::parse($projet->date_arrivee)->format('d/m/Y') }}
-                            @else
-                                <span class="text-muted">Non définie</span>
-                            @endif
-                        </td>
-
-                        {{-- État (badge coloré) --}}
-                        <td>
-                            @php
-                                // Choisir la couleur du badge selon l'état
-                                switch($projet->etat) {
-                                    case 'favorable':
-                                        $badgeColor = 'success';
-                                        break;
-                                    case 'defavorable':
-                                        $badgeColor = 'danger';
-                                        break;
-                                    default:
-                                        $badgeColor = 'secondary';
-                                        break;
-                                }
-                            @endphp
-                            <span class="badge bg-{{ $badgeColor }}">
-                                {{ ucfirst($projet->etat) }}
-                            </span>
-                        </td>
-
-                        {{-- Saisi par (utilisateur) --}}
-                        <td>
-                            {{ $projet->user ? $projet->user->name : 'N/A' }}
-                        </td>
-
-                        {{-- Actions : Modification / Suppression --}}
-                        <td class="text-nowrap">
-                            <a href="{{ route('chef.grandprojets.cpc.edit', $projet) }}"
-                               class="btn btn-warning btn-sm me-1"
-                               onclick="event.stopPropagation();">
-                                <i class="fas fa-edit"></i> Modifier
-                            </a>
-
-                            {{-- Formulaire de suppression --}}
-                            <form action="{{ route('chef.grandprojets.cpc.destroy', $projet) }}"
-                                  method="POST"
-                                  class="d-inline"
-                                  onsubmit="event.stopPropagation(); return confirm('Supprimer ce projet ?');">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn btn-danger btn-sm">
-                                    <i class="fas fa-trash"></i> Supprimer
-                                </button>
-                            </form>
-                        </td>
-
-                    </tr>
-                    @endforeach
-                </tbody>
-            </table>
+  {{-- Filtres --}}
+  <form method="GET" class="card shadow-sm mb-3">
+    <div class="card-body">
+      <div class="row g-2">
+        <div class="col-md-3">
+          <label class="form-label">Recherche</label>
+          <input type="text" name="search" value="{{ request('search') }}" class="form-control" placeholder="n° dossier, intitulé, pétitionnaire…">
         </div>
 
-        {{-- Pagination stylisée --}}
-        <div class="mt-3 d-flex justify-content-center">
-            {{-- 
-                1. On peut utiliser la pagination par défaut : {{ $grandProjets->links() }}
-                2. OU la pagination Bootstrap 5 : {{ $grandProjets->links('vendor.pagination.bootstrap-5') }}
-            --}}
-            {{ $grandProjets->links('vendor.pagination.bootstrap-5') }}
+        <div class="col-md-2">
+          <label class="form-label">Du</label>
+          <input type="date" name="date_from" value="{{ request('date_from') }}" class="form-control">
         </div>
-    @else
-        <p class="text-center text-muted">Aucun projet CPC disponible.</p>
-    @endif
 
+        <div class="col-md-2">
+          <label class="form-label">Au</label>
+          <input type="date" name="date_to" value="{{ request('date_to') }}" class="form-control">
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Province / Préfecture</label>
+          @php
+            $provinces = [
+              'Préfecture Oujda-Angad',
+              'Province Berkane',
+              'Province Jerada',
+              'Province Taourirt',
+              'Province Figuig',
+            ];
+          @endphp
+          <select name="province" class="form-select">
+            <option value="">-- Toutes --</option>
+            @foreach($provinces as $prov)
+              <option value="{{ $prov }}" {{ request('province')===$prov ? 'selected' : '' }}>{{ $prov }}</option>
+            @endforeach
+          </select>
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label">État</label>
+          <select name="etat" class="form-select">
+            <option value="">-- Tous --</option>
+            @foreach(($etatsOptions ?? []) as $value => $label)
+              <option value="{{ $value }}" {{ request('etat')===$value ? 'selected' : '' }}>{{ $label }}</option>
+            @endforeach
+          </select>
+        </div>
+      </div>
+
+      <div class="mt-3 d-flex gap-2">
+        <button class="btn btn-primary"><i class="fas fa-filter me-1"></i> Filtrer</button>
+        <a class="btn btn-outline-secondary" href="{{ route('chef.grandprojets.cpc.index') }}">Réinitialiser</a>
+      </div>
+    </div>
+  </form>
+
+  {{-- Flash --}}
+  @if(session('success'))
+    <div class="alert alert-success">{{ session('success') }}</div>
+  @endif
+
+  {{-- Tableau --}}
+  @if($grandProjets->count())
+    <div class="card shadow-sm">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-dark">
+            <tr>
+              <th>#</th>
+              <th>N° Dossier</th>
+              <th>Intitulé</th>
+              <th>Commune</th>
+              <th>Province</th>
+              <th>État</th>
+              <th>Date arrivée</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @foreach($grandProjets as $i => $item)
+              <tr>
+                <td>{{ $grandProjets->firstItem() + $i }}</td>
+                <td><strong>{{ $item->numero_dossier }}</strong></td>
+                <td>{{ $item->intitule_projet }}</td>
+                <td>{{ $item->commune_1 }}</td>
+                <td>{{ $item->province }}</td>
+                <td>
+                  @php
+                    $label = $etatsOptions[$item->etat] ?? $item->etat;
+                    $badge = match($item->etat) {
+                      'transmis_dajf','transmis_dgu','vers_comm_interne' => 'secondary',
+                      'recu_dajf','recu_dgu','comm_interne'              => 'primary',
+                      'comm_mixte'                                        => 'info',
+                      'signature_3'                                       => 'warning',
+                      'retour_bs'                                          => 'dark',
+                      'archive'                                           => 'success',
+                      default                                             => 'light'
+                    };
+                  @endphp
+                  <span class="badge bg-{{ $badge }}">{{ $label }}</span>
+                </td>
+                <td>{{ $item->date_arrivee ? \Carbon\Carbon::parse($item->date_arrivee)->format('d/m/Y') : '-' }}</td>
+                <td class="text-end">
+                  <a href="{{ route('cpc.show.shared', $item) }}" class="btn btn-sm btn-outline-secondary" target="_blank">
+                    Détails
+                  </a>
+                  <a href="{{ route('chef.grandprojets.cpc.edit', $item) }}" class="btn btn-sm btn-outline-primary">
+                    Éditer
+                  </a>
+
+                  {{-- === Bouton Compléter si retour_bs & favorable === --}}
+                  @if(method_exists($item,'canBeCompletedByBS') && $item->canBeCompletedByBS())
+                    <a href="{{ route('chef.grandprojets.cpc.complete.form', $item) }}"
+                       class="btn btn-sm btn-success">
+                      Compléter
+                    </a>
+                  @endif
+                </td>
+              </tr>
+            @endforeach
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card-footer">
+        {{ $grandProjets->links('vendor.pagination.bootstrap-5') }}
+      </div>
+    </div>
+  @else
+    <div class="alert alert-info">Aucun dossier trouvé.</div>
+  @endif
 </div>
 @endsection

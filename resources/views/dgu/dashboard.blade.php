@@ -63,11 +63,11 @@
                     </form>
                   @endif
 
-                  {{-- Transmettre Commission --}}
+                  {{-- Transmettre vers Commission (étape intermédiaire "vers_comm_interne") --}}
                   @if($item->etat === 'recu_dgu')
                     <form class="d-inline" method="POST" action="{{ route('dgu.transition', $item) }}">
                       @csrf
-                      <input type="hidden" name="etat" value="comm_interne">
+                      <input type="hidden" name="etat" value="vers_comm_interne">
                       <button class="btn btn-warning btn-sm">Transmettre Commission</button>
                     </form>
                   @endif

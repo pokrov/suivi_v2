@@ -12,40 +12,60 @@ use Illuminate\Support\Facades\DB;
 class GrandProjetCPCController extends Controller
 {
     public function index()
-    {
-        $search   = request('search');
-        $dateFrom = request('date_from');
-        $dateTo   = request('date_to');
-        $province = request('province');
+{
+    $search   = request('search');
+    $dateFrom = request('date_from');
+    $dateTo   = request('date_to');
+    $province = request('province');
+    $etat     = request('etat'); // ⬅️ new
 
-        $query = GrandProjet::where('type_projet', 'cpc')->with('user');
+    $query = GrandProjet::where('type_projet', 'cpc')->with('user');
 
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('numero_dossier', 'LIKE', "%{$search}%")
-                  ->orWhere('numero_arrivee', 'LIKE', "%{$search}%")
-                  ->orWhere('intitule_projet', 'LIKE', "%{$search}%")
-                  ->orWhere('commune_1', 'LIKE', "%{$search}%")
-                  ->orWhere('commune_2', 'LIKE', "%{$search}%")
-                  ->orWhere('etat', 'LIKE', "%{$search}%")
-                  ->orWhere('petitionnaire', 'LIKE', "%{$search}%")
-                  ->orWhere('maitre_oeuvre', 'LIKE', "%{$search}%")
-                  ->orWhere('categorie_projet', 'LIKE', "%{$search}%")
-                  ->orWhere('categorie_petitionnaire', 'LIKE', "%{$search}%")
-                  ->orWhere('situation', 'LIKE', "%{$search}%")
-                  ->orWhere('observations', 'LIKE', "%{$search}%");
-            });
-        }
-
-        if ($dateFrom && $dateTo)      $query->whereBetween('date_arrivee', [$dateFrom, $dateTo]);
-        elseif ($dateFrom)             $query->where('date_arrivee', '>=', $dateFrom);
-        elseif ($dateTo)               $query->where('date_arrivee', '<=', $dateTo);
-
-        if ($province)                 $query->where('province', $province);
-
-        $grandProjets = $query->latest()->paginate(10);
-        return view('grandprojets.cpc.index', compact('grandProjets'));
+    if ($search) {
+        $query->where(function ($q) use ($search) {
+            $q->where('numero_dossier', 'LIKE', "%{$search}%")
+              ->orWhere('numero_arrivee', 'LIKE', "%{$search}%")
+              ->orWhere('intitule_projet', 'LIKE', "%{$search}%")
+              ->orWhere('commune_1', 'LIKE', "%{$search}%")
+              ->orWhere('commune_2', 'LIKE', "%{$search}%")
+              ->orWhere('etat', 'LIKE', "%{$search}%")
+              ->orWhere('petitionnaire', 'LIKE', "%{$search}%")
+              ->orWhere('maitre_oeuvre', 'LIKE', "%{$search}%")
+              ->orWhere('categorie_projet', 'LIKE', "%{$search}%")
+              ->orWhere('categorie_petitionnaire', 'LIKE', "%{$search}%")
+              ->orWhere('situation', 'LIKE', "%{$search}%")
+              ->orWhere('observations', 'LIKE', "%{$search}%");
+        });
     }
+
+    if ($dateFrom && $dateTo)      $query->whereBetween('date_arrivee', [$dateFrom, $dateTo]);
+    elseif ($dateFrom)             $query->where('date_arrivee', '>=', $dateFrom);
+    elseif ($dateTo)               $query->where('date_arrivee', '<=', $dateTo);
+
+    if ($province)                 $query->where('province', $province);
+
+    if ($etat)                     $query->where('etat', $etat); // ⬅️ new (ou ->etat($etat))
+
+    $grandProjets = $query->latest()->paginate(10)->appends(request()->query());
+
+    // pour remplir la liste déroulante côté vue
+    $etatsOptions = [
+        'transmis_dajf'     => 'Vers DAJF',
+        'recu_dajf'         => 'DAJF',
+        'transmis_dgu'      => 'Vers DGU',
+        'recu_dgu'          => 'DGU',
+        'vers_comm_interne' => 'Vers Comm. Interne',
+        'comm_interne'      => 'Comm. Interne',
+        'comm_mixte'        => 'Comm. Mixte',
+        'signature_3'       => '3ᵉ signature',
+        'retour_dgu'        => 'Retour DGU',
+        'retour_bs'         => 'Bureau de suivi',
+        'archive'           => 'Archivé',
+    ];
+
+    return view('grandprojets.cpc.index', compact('grandProjets','etatsOptions'));
+}
+
 
     public function create()
     {
@@ -77,25 +97,23 @@ class GrandProjetCPCController extends Controller
             'date_commission_mixte'   => 'nullable|date',
         ]);
 
-        $validated['type_envoi'] = $request->has('envoi_papier') ? 'papier' : 'email';
+        $validated['type_envoi']  = $request->has('envoi_papier') ? 'papier' : 'email';
         $validated['type_projet'] = 'cpc';
         $validated['user_id']     = Auth::id();
 
-        // Etat initial si non fourni
-        if (empty($validated['etat'])) {
-            $validated['etat'] = 'enregistrement';
-        }
+        // ✅ Etat initial demandé : transmis_dajf
+        $validated['etat']        = 'transmis_dajf';
 
         $gp = GrandProjet::create($validated);
 
-        // Journal initial : entrée dans l'état initial (enregistrement)
+        // Journal initial
         FluxEtape::create([
             'grand_projet_id' => $gp->id,
             'from_etat'       => '—',
-            'to_etat'         => $gp->etat,           // enregistrement
+            'to_etat'         => 'transmis_dajf',
             'happened_at'     => $gp->created_at,
             'by_user'         => auth()->id(),
-            'note'            => 'Création du dossier',
+            'note'            => 'Création (transmis à la DAJF)',
         ]);
 
         if (Auth::user()->hasRole('chef')) {
@@ -198,4 +216,77 @@ class GrandProjetCPCController extends Controller
 
         return back()->with('success', "État mis à jour : {$from} → {$to}");
     }
+        /** Formulaire de complétion Bureau de suivi (uniquement si retour_bs & favorable) */
+    public function completeForm(GrandProjet $grandProjet)
+    {
+        abort_unless($grandProjet->canBeCompletedByBS(), 403, 'Ce dossier n’est pas éligible à la complétion Bureau de suivi.');
+        return view('grandprojets.cpc.complete', compact('grandProjet'));
+    }
+
+    /** Enregistrement complétion Bureau de suivi */
+    // app/Http/Controllers/GrandProjetCPCController.php
+
+public function completeStore(Request $request, GrandProjet $grandProjet)
+{
+    abort_unless($grandProjet->canBeCompletedByBS(), 403, 'Ce dossier n’est pas éligible à la complétion Bureau de suivi.');
+
+    // 1) Normaliser les décimales (virgule -> point) et nettoyer les espaces fines
+    $clean = $request->all();
+    $normalizeNumber = function ($v) {
+        if ($v === null || $v === '') return null;
+        // enlever espaces, espaces insécables, etc.
+        $v = preg_replace('/[^\d,.\-]/u', '', (string)$v);
+        // convertir virgule en point
+        $v = str_replace(',', '.', $v);
+        return $v;
+    };
+
+    foreach (['superficie_terrain','superficie_couverte','montant_investissement'] as $k) {
+        if (array_key_exists($k, $clean)) {
+            $clean[$k] = $normalizeNumber($clean[$k]);
+        }
+    }
+
+    // 2) Valider (après normalisation)
+    $validated = \Validator::make($clean, [
+        'date_commission_mixte_effective' => ['nullable','date'],
+        'superficie_terrain'              => ['nullable','numeric','min:0'],
+        'superficie_couverte'             => ['nullable','numeric','min:0'],
+        'montant_investissement'          => ['nullable','numeric','min:0'],
+        'emplois_prevus'                  => ['nullable','integer','min:0'],
+        'nb_logements'                    => ['nullable','integer','min:0'],
+    ])->validate();
+
+    // 3) Calcul auto si non fourni
+    $TAUX_PAR_M2 = (float) config('app.bs_rate_mad_per_m2', 1200);
+    if (
+        (empty($validated['montant_investissement']) || (float)$validated['montant_investissement'] === 0.0)
+        && !empty($validated['superficie_couverte'])
+    ) {
+        $validated['montant_investissement'] = round((float)$validated['superficie_couverte'] * $TAUX_PAR_M2, 2);
+    }
+
+    // 4) Sauvegarde + journalisation
+    \DB::transaction(function () use ($grandProjet, $validated) {
+        $grandProjet->fill($validated);
+        $grandProjet->bs_completed_at = now();
+        $grandProjet->bs_completed_by = auth()->id();
+        $grandProjet->save();
+
+        \App\Models\FluxEtape::create([
+            'grand_projet_id' => $grandProjet->id,
+            'from_etat'       => 'retour_bs',
+            'to_etat'         => 'retour_bs',
+            'happened_at'     => now(),
+            'by_user'         => auth()->id(),
+            'note'            => 'Complétion Bureau de suivi (superficies, montants, emplois, logements).',
+        ]);
+    });
+
+    return redirect()
+        ->route('chef.grandprojets.cpc.index')
+        ->with('success', 'Complétion enregistrée.');
+}
+
+
 }

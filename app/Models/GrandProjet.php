@@ -34,8 +34,16 @@ class GrandProjet extends Model
         'observations',
         'etat',
         'user_id',
-        // si tu as cette colonne
-     
+
+        // ===== Complétion Bureau de suivi =====
+        'date_commission_mixte_effective',
+        'superficie_terrain',
+        'superficie_couverte',
+        'montant_investissement',
+        'emplois_prevus',
+        'nb_logements',
+        'bs_completed_at',
+        'bs_completed_by',
     ];
 
     /* ===== Relations ===== */
@@ -66,21 +74,26 @@ class GrandProjet extends Model
         return optional($this->lastExamen)->avis === 'favorable';
     }
 
-    /* ===== Machine à états (complète) ===== */
+    /** éligible au bouton "Compléter" côté Chef/Saisie */
+    public function canBeCompletedByBS(): bool
+    {
+        return $this->etat === 'retour_bs' && $this->isFavorable();
+    }
+
+    /* ===== Machine à états (mise à jour) ===== */
     public static function allowedMap(): array
     {
         return [
-            'enregistrement' => ['transmis_dajf','recu_dajf'], // selon ton flux réel
-            'transmis_dajf'  => ['recu_dajf'],
-            'recu_dajf'      => ['transmis_dgu'],
-            'transmis_dgu'   => ['recu_dgu'],
-            'recu_dgu'       => ['comm_interne'],
-            'comm_interne'   => ['comm_mixte','signature_3','retour_bs','retour_dgu'],
-            'comm_mixte'     => ['signature_3','retour_bs'],
-            'signature_3'    => ['retour_bs','archive'],
-            'retour_dgu'     => ['transmis_dgu','archive'],
-            'retour_bs'      => ['archive'],
-            'archive'        => [],
+            'transmis_dajf'     => ['recu_dajf'],
+            'recu_dajf'         => ['transmis_dgu'],
+            'transmis_dgu'      => ['recu_dgu'],
+            'recu_dgu'          => ['comm_interne'],
+            'vers_comm_interne' => ['comm_interne'],
+            'comm_interne'      => ['comm_mixte'],              // interne -> mixte (toujours)
+            'comm_mixte'        => ['signature_3', 'retour_bs'],// mixte -> 3e sig OU retour_bs
+            'signature_3'       => ['retour_bs','archive'],
+            'retour_bs'         => ['archive'],
+            'archive'           => [],
         ];
     }
 
@@ -94,15 +107,14 @@ class GrandProjet extends Model
     {
         return [
             'dajf' => [
-                'enregistrement' => ['recu_dajf'],
                 'transmis_dajf'  => ['recu_dajf'],
                 'recu_dajf'      => ['transmis_dgu'],
             ],
             'dgu' => [
-                'transmis_dgu'  => ['recu_dgu'],
-                'recu_dgu'      => ['comm_interne'],
+                'transmis_dgu'   => ['recu_dgu'],
+                'recu_dgu'       => ['comm_interne'],
             ],
-            // commission interne via ExamenController → comm_mixte ou autre
+            // Commission interne -> mixte gérée par ExamenController
         ];
     }
 
@@ -110,16 +122,16 @@ class GrandProjet extends Model
     public static function trackerSteps(): array
     {
         return [
-            'enregistrement',
-            'transmis_dajf',
-            'recu_dajf',
-            'transmis_dgu',
-            'recu_dgu',
-            'comm_interne',
-            'comm_mixte',
-            'signature_3',
-            'retour_bs',
-            'archive',
+            'transmis_dajf',     // 1  Saisie (libellé UI)
+            'recu_dajf',         // 2  Vers DAJF
+            'transmis_dgu',      // 3  DAJF
+            'recu_dgu',          // 4  Vers DGU
+            'vers_comm_interne', // 5  DGU (alias UI)
+            'comm_interne',      // 6  Vers Comm. Interne
+            'comm_mixte',        // 7  Comm. Interne
+            'signature_3',       // 8  Comm. Mixte
+            'retour_bs',         // 9  3ᵉ signature (puis retour_bs)
+            'archive',           // 10 Bureau de suivi / 11 Archivé (affichage en vue)
         ];
     }
 

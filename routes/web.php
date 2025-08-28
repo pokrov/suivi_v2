@@ -12,6 +12,8 @@ use App\Http\Controllers\MaitreOeuvreController;
 use App\Http\Controllers\GrandProjetCPCController;
 use App\Http\Controllers\GrandProjetCLMController;
 use App\Http\Controllers\ExamenController;
+use App\Http\Controllers\CommissionActionsController;
+
 use App\Http\Controllers\StatsController;
 
 Auth::routes();
@@ -71,11 +73,24 @@ Route::middleware(['auth', 'role:super_admin'])
     });
 
 /* ===== CHEF ===== */
+/* ===== GRAND PROJETS (CHEF) ===== */
 Route::middleware(['auth', 'role:chef'])
     ->prefix('chef')->name('chef.')->group(function () {
         Route::get('/dashboard', fn () => view('chef.dashboard'))->name('dashboard');
         Route::get('/stats', [StatsController::class, 'index'])->name('stats.index');
+
+        Route::prefix('grandprojets')->name('grandprojets.')->group(function () {
+            Route::resource('cpc', GrandProjetCPCController::class)->parameters(['cpc' => 'grandProjet']);
+            Route::get('cpc/{grandProjet}/examens/create', [ExamenController::class, 'create'])->name('cpc.examens.create');
+            Route::post('cpc/{grandProjet}/examens', [ExamenController::class, 'store'])->name('cpc.examens.store');
+            Route::post('cpc/{grandProjet}/etat', [GrandProjetCPCController::class, 'changerEtat'])->name('cpc.changerEtat');
+
+            // === Complétion Bureau de suivi (côté CHEF) ===
+            Route::get ('cpc/{grandProjet}/complete', [GrandProjetCPCController::class, 'completeForm'])->name('cpc.complete.form');
+            Route::put ('cpc/{grandProjet}/complete', [GrandProjetCPCController::class, 'completeStore'])->name('cpc.complete.store');
+        });
     });
+
 
 /* ===== GRAND PROJETS (CHEF) ===== */
 Route::middleware(['auth', 'role:chef'])
@@ -201,7 +216,7 @@ Route::middleware(['auth','role:dgu'])
 
         Route::get('/outbox', function () {
             $items = GrandProjet::cpc()
-                ->whereIn('etat', ['comm_interne'])
+                ->whereIn('etat', ['vers_comm_interne']) // <-- modifié (suivi : ce qui a été transmis vers la commission)
                 ->latest()->paginate(12);
             $scope = 'outbox';
             return view('dgu.dashboard', compact('items','scope'));
@@ -214,8 +229,8 @@ Route::middleware(['auth','role:dgu'])
             $to   = $request->etat;
 
             $allowed = [
-                'transmis_dgu'  => ['recu_dgu'],
-                'recu_dgu'      => ['comm_interne'],
+                'transmis_dgu'      => ['recu_dgu'],
+                'recu_dgu'          => ['vers_comm_interne'], // <-- modifié
             ];
             abort_unless(isset($allowed[$from]) && in_array($to, $allowed[$from], true), 403, 'Transition non autorisée pour DGU.');
 
@@ -242,13 +257,69 @@ Route::middleware(['auth','role:dgu'])
 /* ===== COMMISSION INTERNE ===== */
 Route::middleware(['auth','role:comm_interne'])
     ->prefix('comm')->name('comm.')->group(function () {
+
+        // Dashboard avec scopes (onglets) + sous-filtre pour la mixte
         Route::get('/dashboard', function () {
-            $items = GrandProjet::cpc()->where('etat','comm_interne')->latest()->paginate(12);
-            return view('comm.dashboard', compact('items'));
+            $scope = request('scope', 'interne');
+
+            // Mapping onglet -> états
+            $map = [
+                'recevoir'  => ['vers_comm_interne'],                                 // À recevoir
+                'interne'   => ['comm_interne'],                                      // Commission interne
+                'mixte'     => ['comm_mixte'],                                        // Commission mixte (avec sous-filtre interne favorable/défavorable)
+                'signature' => ['signature_3'],                                       // 3ème signature
+                'suivi'     => ['retour_bs'],                                         // Bureau de suivi
+                'tous'      => ['vers_comm_interne','comm_interne','comm_mixte','signature_3','retour_bs'],
+            ];
+            $states = $map[$scope] ?? $map['interne'];
+
+            // Charger examens pour lire l'avis interne
+            $q = \App\Models\GrandProjet::cpc()
+                ->with(['examens' => function($qq){ $qq->orderBy('numero_examen','desc'); }])
+                ->whereIn('etat', $states)
+                ->latest();
+
+            // Sous-filtre spécifique à "mixte" : ?mixte=to_sig | to_bs | all
+            $mixte = request('mixte', 'all');
+            if ($scope === 'mixte' && in_array($mixte, ['to_sig','to_bs'], true)) {
+                $items = $q->get()->filter(function($gp) use ($mixte){
+                    $lastInterne = $gp->examens->firstWhere('type_examen','interne');
+                    $avis = $lastInterne->avis ?? null; // 'favorable' | 'defavorable' | null
+                    if ($mixte === 'to_sig') return $avis === 'favorable';
+                    if ($mixte === 'to_bs')  return $avis === 'defavorable';
+                    return true;
+                });
+                // Paginer "manuellement" après filtre (simple)
+                $items = new \Illuminate\Pagination\LengthAwarePaginator(
+                    $items->values(),
+                    $items->count(),
+                    12,
+                    request('page',1),
+                    ['path' => request()->url(), 'query' => request()->query()]
+                );
+            } else {
+                $items = $q->paginate(12);
+            }
+
+            return view('comm.dashboard', compact('items','scope','mixte'));
         })->name('dashboard');
 
-        Route::get('/cpc/{grandProjet}/examens/create', [ExamenController::class, 'create'])->name('examens.create');
-        Route::post('/cpc/{grandProjet}/examens',       [ExamenController::class, 'store'])->name('examens.store');
+        // Examens (avis interne / mixte)
+        Route::get('/cpc/{grandProjet}/examens/create', [\App\Http\Controllers\ExamenController::class, 'create'])->name('examens.create');
+        Route::post('/cpc/{grandProjet}/examens',       [\App\Http\Controllers\ExamenController::class, 'store'])->name('examens.store');
+
+        // Recevoir (vers_comm_interne -> comm_interne)
+        Route::post('/cpc/{grandProjet}/recevoir', [\App\Http\Controllers\CommissionActionsController::class, 'receive'])->name('recevoir');
+
+        // MIXTE : envoyer selon l'avis interne
+        Route::post('/cpc/{grandProjet}/mixte-to-signature', [\App\Http\Controllers\CommissionActionsController::class, 'mixteToSignature'])->name('mixte.toSignature'); // comm_mixte -> signature_3
+        Route::post('/cpc/{grandProjet}/mixte-to-bs',        [\App\Http\Controllers\CommissionActionsController::class, 'mixteToBs'])->name('mixte.toBs');           // comm_mixte -> retour_bs
+
+        // 3e signature -> retour_bs
+        Route::post('/cpc/{grandProjet}/marquer-signe', [\App\Http\Controllers\CommissionActionsController::class, 'markSigned'])->name('markSigned');
+
+        // Bureau de suivi -> archive
+        Route::post('/cpc/{grandProjet}/archiver', [\App\Http\Controllers\CommissionActionsController::class, 'archive'])->name('archive');
     });
 
 /* ===== FICHE PARTAGÉE (lecture) ===== */

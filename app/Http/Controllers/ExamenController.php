@@ -11,114 +11,78 @@ use Illuminate\Support\Facades\DB;
 
 class ExamenController extends Controller
 {
-    /**
-     * Formulaire d'avis (commission interne).
-     */
-    public function create(GrandProjet $grandProjet)
-    {
-        // Sécurité : seuls les dossiers à la commission interne sont traitables ici
-        abort_unless($grandProjet->etat === 'comm_interne', 403, 'Dossier non à la commission interne.');
+    // app/Http/Controllers/ExamenController.php
 
-        // N° d’examen proposé (calcul côté serveur)
-        $nextNumero = $grandProjet->next_numero_examen;
+public function create(GrandProjet $grandProjet)
+{
+    // Numéro d’examen suivant (provient de l’accessor du modèle)
+    $nextNumero = $grandProjet->next_numero_examen;
 
-        return view('examens.create', [
-            'grandProjet' => $grandProjet,
-            'nextNumero'  => $nextNumero,
-        ]);
-    }
+    // Libellé affiché selon l’état courant
+    $typeLabel = match ($grandProjet->etat) {
+        'comm_interne' => 'Commission interne',
+        'comm_mixte'   => 'Commission mixte',
+        default        => 'Examen',
+    };
 
-    /**
-     * Enregistre un avis de commission interne.
-     * - Calcule numero_examen côté serveur
-     * - Enregistre l'examen
-     * - Redirige le dossier: defavorable -> retour_dgu ; sinon -> retour_bs
-     * - Journalise la transition
-     */
+    return view('examens.create', compact('grandProjet', 'nextNumero', 'typeLabel'));
+}
+
+
     public function store(Request $request, GrandProjet $grandProjet)
     {
-        abort_unless($grandProjet->etat === 'comm_interne', 403, 'Dossier non à la commission interne.');
-
         $data = $request->validate([
-            'date_examen'   => ['required','date'], // on utilise date_examen
-            'avis'          => ['required','in:favorable,defavorable,ajourne,sans_avis'],
-            'observations'  => ['nullable','string'],
+            'avis'          => 'required|in:favorable,defavorable',
+            'observations'  => 'nullable|string',
+            'date_examen'   => 'nullable|date',
         ]);
 
-        // Numéro d’examen calculé côté serveur (NE PAS le demander au client)
-        $numero = $grandProjet->next_numero_examen;
+        $current = $grandProjet->etat;
 
-        DB::transaction(function () use ($grandProjet, $data, $numero) {
-            // Créer l’examen (type interne)
+        DB::transaction(function () use ($grandProjet, $data, $current) {
+
+            // Déterminer le type d’examen selon l’état courant
+            $type = match ($current) {
+                'comm_interne' => 'interne',
+                'comm_mixte'   => 'mixte',
+                default        => 'interne', // fallback
+            };
+
+            // Créer l’examen
             Examen::create([
                 'grand_projet_id' => $grandProjet->id,
-                'numero_examen'   => $numero,
-                'type_examen'     => 'interne',              // la colonne peut exister ou non (fillable côté modèle)
-                'date_examen'     => $data['date_examen'],   // nouvelle colonne standard
-                // Si ta table a encore "date_commission", tu peux aussi la remplir:
-                'date_commission' => $data['date_examen'],
+                'numero_examen'   => $grandProjet->next_numero_examen,
+                'type_examen'     => $type,
                 'avis'            => $data['avis'],
                 'observations'    => $data['observations'] ?? null,
-                'created_by'      => Auth::id(),
+                'date_examen'     => $data['date_examen'] ?? now(),
+                'auteur_id'       => Auth::id(),
             ]);
 
-            // Choisir la redirection du flux
-            $to   = $data['avis'] === 'defavorable' ? 'retour_dgu' : 'retour_bs';
-            $from = $grandProjet->etat;
+            // Calcul de la transition selon la règle de gestion
+            $to = $current;
+            if ($current === 'comm_interne') {
+                // Toujours vers la mixte après l’avis interne
+                $to = 'comm_mixte';
+            } elseif ($current === 'comm_mixte') {
+                // Mixte favorable -> signature_3 ; défavorable -> retour_bs
+                $to = ($data['avis'] === 'favorable') ? 'signature_3' : 'retour_bs';
+            }
 
-            // Changer l’état + journaliser
-            $grandProjet->update(['etat' => $to]);
+            if ($to !== $current) {
+                $grandProjet->update(['etat' => $to]);
 
-            FluxEtape::create([
-                'grand_projet_id' => $grandProjet->id,
-                'from_etat'       => $from,
-                'to_etat'         => $to,
-                'happened_at'     => now(),
-                'by_user'         => Auth::id(),
-                'note'            => 'Avis commission interne (examen n° '.$numero.')',
-            ]);
+                FluxEtape::create([
+                    'grand_projet_id' => $grandProjet->id,
+                    'from_etat'       => $current,
+                    'to_etat'         => $to,
+                    'happened_at'     => now(),
+                    'by_user'         => Auth::id(),
+                    'note'            => "Transition automatique après avis ($type).",
+                ]);
+            }
         });
 
-        return redirect()
-            ->route('comm.dashboard')
-            ->with('success', "Avis enregistré (examen n° {$numero}) et dossier redirigé.");
-    }
-
-    /**
-     * Formulaire d’édition d’un avis (interne).
-     */
-    public function edit(Examen $examen)
-    {
-        abort_unless($examen->type_examen === 'interne' || is_null($examen->type_examen), 403);
-
-        return view('examens.edit', [
-            'examen'      => $examen,
-            'grandProjet' => $examen->grandProjet,
-        ]);
-    }
-
-    /**
-     * Met à jour l’avis (sans repositionner le flux automatiquement).
-     */
-    public function update(Request $request, Examen $examen)
-    {
-        abort_unless($examen->type_examen === 'interne' || is_null($examen->type_examen), 403);
-
-        $data = $request->validate([
-            'date_examen'   => ['required','date'],
-            'avis'          => ['required','in:favorable,defavorable,ajourne,sans_avis'],
-            'observations'  => ['nullable','string'],
-        ]);
-
-        $examen->update([
-            'date_examen'     => $data['date_examen'],
-            'date_commission' => $data['date_examen'], // si la colonne existe toujours
-            'avis'            => $data['avis'],
-            'observations'    => $data['observations'] ?? null,
-        ]);
-
-        return redirect()
-            ->route('comm.dashboard')
-            ->with('success', 'Avis modifié avec succès.');
+        return back()->with('success', 'Avis enregistré et dossier routé.');
     }
 }
