@@ -77,7 +77,7 @@ class GrandProjet extends Model
     /** éligible au bouton "Compléter" côté Chef/Saisie */
     public function canBeCompletedByBS(): bool
     {
-        return $this->etat === 'retour_bs' && $this->isFavorable();
+        return $this->etat === 'retour_bs' ;
     }
 
     /* ===== Machine à états (mise à jour) ===== */
