@@ -44,6 +44,8 @@ class GrandProjet extends Model
         'nb_logements',
         'bs_completed_at',
         'bs_completed_by',
+        'assigned_dajf_id','assigned_dajf_at',
+    'assigned_dgu_id','assigned_dgu_at',
     ];
 
     /* ===== Relations ===== */
@@ -68,7 +70,14 @@ class GrandProjet extends Model
     {
         return (int)($this->examens()->max('numero_examen') ?? 0) + 1;
     }
-
+    public function assigneeDajf()
+{
+    return $this->belongsTo(User::class, 'assigned_dajf_id');
+}
+public function assigneeDgu()
+{
+    return $this->belongsTo(User::class, 'assigned_dgu_id');
+}
     public function isFavorable(): bool
     {
         return optional($this->lastExamen)->avis === 'favorable';
@@ -144,6 +153,7 @@ class GrandProjet extends Model
     protected $casts = [
     'categorie_projet' => 'array',
     'envoi_papier'     => 'boolean',
+    
 ];
 
 }

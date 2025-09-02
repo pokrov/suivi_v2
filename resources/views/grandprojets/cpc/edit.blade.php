@@ -216,7 +216,7 @@
               @error('intitule_projet') <div class="invalid-feedback">{{ $message }}</div> @enderror
             </div>
 
-            {{-- Lien vers la GED (optionnel) --}}
+            <!-- {{-- Lien vers la GED (optionnel) --}}
             <div class="mb-3">
               <label class="form-label">Lien vers la GED (optionnel)</label>
               <input type="url"
@@ -224,7 +224,7 @@
                      class="form-control"
                      value="{{ old('lien_ged', $grandProjet->lien_ged) }}"
                      placeholder="http://...">
-            </div>
+            </div> -->
 
             {{-- Catégorie du Projet --}}
             <div class="mb-3">

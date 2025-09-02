@@ -185,11 +185,11 @@
               @error('intitule_projet') <div class="invalid-feedback">{{ $message }}</div> @enderror
             </div>
 
-            {{-- Lien GED --}}
+            <!-- {{-- Lien GED --}}
             <div class="mb-3">
               <label class="form-label">Lien vers la GED (optionnel)</label>
               <input type="url" name="lien_ged" value="{{ old('lien_ged', $grandProjet->lien_ged) }}" class="form-control" placeholder="http://...">
-            </div>
+            </div> -->
 
             {{-- Catégorie du Projet (CLM) — Cases à cocher (multi) --}}
             @php

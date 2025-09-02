@@ -7,35 +7,51 @@
     $isInbox = ($scope ?? 'inbox') === 'inbox';
     $isCpc   = ($type ?? 'cpc') === 'cpc';
     $title   = 'DAJF — '.($isCpc?'CPC':'CLM').' — '.($isInbox?'À traiter':'Envoyés');
+
+    // pour construire les URLs de “Mes / Tous”
+    $baseRoute = $isInbox ? 'dajf.inbox' : 'dajf.outbox';
+    $qsCpcMine = fn($mine) => route($baseRoute, ['type'=>'cpc','mine'=>$mine]);
+    $qsClmMine = fn($mine) => route($baseRoute, ['type'=>'clm','mine'=>$mine]);
+    $mineCur   = request('mine','1') === '1';
   @endphp
 
   <h3 class="mb-3">{{ $title }}</h3>
 
   {{-- 4 gros boutons très lisibles --}}
-  <div class="row g-3 mb-4">
+  <div class="row g-3 mb-3">
     <div class="col-6 col-md-3">
-      <a href="{{ route('dajf.inbox',  ['type'=>'cpc']) }}" class="btn btn-quick w-100 {{ $isInbox && $isCpc ? 'active' : '' }}">
+      <a href="{{ route('dajf.inbox',  ['type'=>'cpc','mine'=>$mineCur?1:0]) }}" class="btn-quick w-100 {{ $isInbox && $isCpc ? 'active' : '' }}">
         <div class="quick-title">CPC à traiter</div>
         <div class="quick-count">{{ $counts['cpc_inbox'] ?? '—' }}</div>
       </a>
     </div>
     <div class="col-6 col-md-3">
-      <a href="{{ route('dajf.outbox', ['type'=>'cpc']) }}" class="btn btn-quick w-100 {{ !$isInbox && $isCpc ? 'active' : '' }}">
+      <a href="{{ route('dajf.outbox', ['type'=>'cpc','mine'=>$mineCur?1:0]) }}" class="btn-quick w-100 {{ !$isInbox && $isCpc ? 'active' : '' }}">
         <div class="quick-title">CPC envoyés</div>
         <div class="quick-count">{{ $counts['cpc_outbox'] ?? '—' }}</div>
       </a>
     </div>
     <div class="col-6 col-md-3">
-      <a href="{{ route('dajf.inbox',  ['type'=>'clm']) }}" class="btn btn-quick w-100 {{ $isInbox && !$isCpc ? 'active' : '' }}">
+      <a href="{{ route('dajf.inbox',  ['type'=>'clm','mine'=>$mineCur?1:0]) }}" class="btn-quick w-100 {{ $isInbox && !$isCpc ? 'active' : '' }}">
         <div class="quick-title">CLM à traiter</div>
         <div class="quick-count">{{ $counts['clm_inbox'] ?? '—' }}</div>
       </a>
     </div>
     <div class="col-6 col-md-3">
-      <a href="{{ route('dajf.outbox', ['type'=>'clm']) }}" class="btn btn-quick w-100 {{ !$isInbox && !$isCpc ? 'active' : '' }}">
+      <a href="{{ route('dajf.outbox', ['type'=>'clm','mine'=>$mineCur?1:0]) }}" class="btn-quick w-100 {{ !$isInbox && !$isCpc ? 'active' : '' }}">
         <div class="quick-title">CLM envoyés</div>
         <div class="quick-count">{{ $counts['clm_outbox'] ?? '—' }}</div>
       </a>
+    </div>
+  </div>
+
+  {{-- bascule Mes / Tous --}}
+  <div class="d-flex justify-content-end mb-3">
+    <div class="btn-group" role="group" aria-label="Filtre propriétaire">
+      <a href="{{ route($baseRoute, ['type'=>$isCpc?'cpc':'clm','mine'=>1]) }}"
+         class="btn btn-sm {{ $mineCur ? 'btn-primary' : 'btn-outline-primary' }}">Mes dossiers</a>
+      <a href="{{ route($baseRoute, ['type'=>$isCpc?'cpc':'clm','mine'=>0]) }}"
+         class="btn btn-sm {{ !$mineCur ? 'btn-primary' : 'btn-outline-primary' }}">Tous</a>
     </div>
   </div>
 
@@ -55,6 +71,7 @@
                 <th>Intitulé</th>
                 <th>Commune</th>
                 <th>État</th>
+                <th>Assigné</th>
                 <th>Date arrivée</th>
                 <th class="text-end">Actions</th>
               </tr>
@@ -64,17 +81,24 @@
               <tr>
                 <td>{{ $items->firstItem() + $i }}</td>
                 <td><strong>{{ $item->numero_dossier }}</strong></td>
-                <td>{{ $item->intitule_projet }}</td>
+                <td class="text-truncate" style="max-width:280px">{{ $item->intitule_projet }}</td>
                 <td>{{ $item->commune_1 }}</td>
                 <td><span class="badge bg-secondary">{{ $item->etat }}</span></td>
+                <td>
+                  @if($item->assigned_dajf_id)
+                    <span class="badge bg-info">{{ optional($item->assigneeDajf)->name ?? '—' }}</span>
+                  @else
+                    <span class="text-muted">Non affecté</span>
+                  @endif
+                </td>
                 <td>{{ $item->date_arrivee ? \Carbon\Carbon::parse($item->date_arrivee)->format('d/m/Y') : '-' }}</td>
                 <td class="text-end">
 
                   {{-- Compléter --}}
-                  <a href="{{ ($isCpc) ? route('dajf.cpc.completer', $item) : route('dajf.clm.completer', $item) }}"
+                  <a href="{{ $isCpc ? route('dajf.cpc.completer', $item) : route('dajf.clm.completer', $item) }}"
                      class="btn btn-info btn-sm me-1">Compléter</a>
 
-                  {{-- Prendre en charge --}}
+                  {{-- Prendre en charge (enregistrement / transmis_dajf) --}}
                   @if(in_array($item->etat, ['enregistrement','transmis_dajf'], true))
                     <form class="d-inline" method="POST"
                           action="{{ $isCpc ? route('dajf.cpc.transition', $item) : route('dajf.clm.transition', $item) }}">
@@ -116,7 +140,7 @@
   @endif
 </div>
 
-{{-- Styles simples pour gros boutons lisibles --}}
+{{-- Styles pour gros boutons lisibles --}}
 <style>
 .btn-quick{
   display:block; text-align:left; border:2px solid #0d6efd; border-radius:14px;

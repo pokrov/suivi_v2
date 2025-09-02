@@ -102,7 +102,7 @@ class GrandProjetCPCController extends Controller
         $validated['user_id']     = Auth::id();
 
         // ✅ Etat initial demandé : transmis_dajf
-        $validated['etat']        = 'transmis_dajf';
+        $validated['etat']        = 'enregistrement';
 
         $gp = GrandProjet::create($validated);
 

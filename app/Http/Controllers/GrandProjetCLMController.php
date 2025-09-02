@@ -94,7 +94,7 @@ class GrandProjetCLMController extends Controller
 
         // Valeurs systèmes
         $data['type_projet']             = 'clm';
-        $data['etat']                    = 'transmis_dajf';
+        $data['etat']                    = 'enregistrement';
         $data['user_id']                 = auth()->id();
         $data['categorie_petitionnaire'] = $data['categorie_petitionnaire'] ?? 'Particulier';
         $data['envoi_papier']            = $request->boolean('envoi_papier');
