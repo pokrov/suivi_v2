@@ -11,30 +11,38 @@ use Illuminate\Support\Facades\DB;
 
 class ExamenController extends Controller
 {
-    // app/Http/Controllers/ExamenController.php
+    /**
+     * Formulaire de création d’un examen
+     */
+    public function create(GrandProjet $grandProjet)
+    {
+        // Numéro d’examen suivant (provient de l’accessor du modèle)
+        $nextNumero = $grandProjet->next_numero_examen;
 
-public function create(GrandProjet $grandProjet)
-{
-    // Numéro d’examen suivant (provient de l’accessor du modèle)
-    $nextNumero = $grandProjet->next_numero_examen;
+        // Libellé affiché selon l’état courant
+        $typeLabel = match ($grandProjet->etat) {
+            'comm_interne' => 'Commission interne',
+            'comm_mixte'   => 'Commission mixte',
+            default        => 'Examen',
+        };
 
-    // Libellé affiché selon l’état courant
-    $typeLabel = match ($grandProjet->etat) {
-        'comm_interne' => 'Commission interne',
-        'comm_mixte'   => 'Commission mixte',
-        default        => 'Examen',
-    };
+        return view('examens.create', compact('grandProjet', 'nextNumero', 'typeLabel'));
+    }
 
-    return view('examens.create', compact('grandProjet', 'nextNumero', 'typeLabel'));
-}
-
-
+    /**
+     * Enregistrement d’un examen + transition automatique
+     */
     public function store(Request $request, GrandProjet $grandProjet)
     {
         $data = $request->validate([
-            'avis'          => 'required|in:favorable,defavorable',
-            'observations'  => 'nullable|string',
-            'date_examen'   => 'nullable|date',
+            'avis'         => 'required|in:favorable,defavorable,ajourne,sans_avis',
+            'observations' => 'nullable|string|max:2000',
+            'date_examen'  => 'nullable|date',
+
+            // Nouveaux champs facultatifs (pour défavorable)
+            'motifs'       => ['nullable','array'],
+            'motifs.*'     => ['in:administratif,juridique_foncier,urbanistique,technique,autre'],
+            'motif_autre'  => ['nullable','string','max:255'],
         ]);
 
         $current = $grandProjet->etat;
@@ -48,6 +56,20 @@ public function create(GrandProjet $grandProjet)
                 default        => 'interne', // fallback
             };
 
+            // Normalisation des motifs : uniquement si avis défavorable
+            $motifs = null;
+            $motifAutre = null;
+
+            if ($data['avis'] === 'defavorable') {
+                $motifs = array_values($data['motifs'] ?? []);
+                $motifAutre = $data['motif_autre'] ?? null;
+
+                // Si "autre" n’est pas coché → ignorer motif_autre
+                if (!in_array('autre', $motifs, true)) {
+                    $motifAutre = null;
+                }
+            }
+
             // Créer l’examen
             Examen::create([
                 'grand_projet_id' => $grandProjet->id,
@@ -57,6 +79,8 @@ public function create(GrandProjet $grandProjet)
                 'observations'    => $data['observations'] ?? null,
                 'date_examen'     => $data['date_examen'] ?? now(),
                 'auteur_id'       => Auth::id(),
+                'motifs'          => $motifs,     // JSON
+                'motif_autre'     => $motifAutre, // String
             ]);
 
             // Calcul de la transition selon la règle de gestion
@@ -83,6 +107,13 @@ public function create(GrandProjet $grandProjet)
             }
         });
 
-        return back()->with('success', 'Avis enregistré et dossier routé.');
+        // Retour à la partie Commission où l’on était avant l’avis
+        $redirectUrl = session('comm_return_url')
+            ?? route('comm.dashboard', [
+                'type'  => $grandProjet->type_projet,
+                'scope' => 'interne'
+            ]);
+
+        return redirect($redirectUrl)->with('success', 'Avis enregistré et dossier routé.');
     }
 }

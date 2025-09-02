@@ -29,7 +29,7 @@
 
                     <div id="grandProjetSubMenu" class="mt-3 d-none">
                         <a href="{{ route('chef.grandprojets.cpc.index') }}" class="btn btn-outline-primary w-100 mb-2">CPC - Projet de Construction</a>
-                        <a href="" class="btn btn-outline-primary w-100">CLM - Lotissement & Morcellement</a>
+                        <a href="{{route('chef.grandprojets.clm.index')}}" class="btn btn-outline-primary w-100">CLM - Lotissement & Morcellement</a>
                     </div>
                 </div>
             </div>

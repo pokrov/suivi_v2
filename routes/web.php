@@ -13,11 +13,11 @@ use App\Http\Controllers\GrandProjetCPCController;
 use App\Http\Controllers\GrandProjetCLMController;
 use App\Http\Controllers\ExamenController;
 use App\Http\Controllers\CommissionActionsController;
-
 use App\Http\Controllers\StatsController;
 
 Auth::routes();
 
+/* ===== REDIRECT RACINE / HOME ===== */
 Route::get('/', fn () => redirect()->route('home'));
 
 Route::get('/home', function () {
@@ -58,7 +58,9 @@ Route::get('/no-role', function () {
     );
 })->name('no.role')->middleware('auth');
 
-/* ===== SUPER ADMIN ===== */
+/* =========================================================
+   SUPER ADMIN
+========================================================= */
 Route::middleware(['auth', 'role:super_admin'])
     ->prefix('superadmin')->name('superadmin.')->group(function () {
         Route::get('/dashboard', [SuperAdminDashboardController::class, 'index'])->name('dashboard');
@@ -72,40 +74,49 @@ Route::middleware(['auth', 'role:super_admin'])
         });
     });
 
-/* ===== CHEF ===== */
-/* ===== GRAND PROJETS (CHEF) ===== */
+/* =========================================================
+   CHEF (DASHBOARD + GRAND PROJETS CPC & CLM)
+========================================================= */
 Route::middleware(['auth', 'role:chef'])
     ->prefix('chef')->name('chef.')->group(function () {
+
         Route::get('/dashboard', fn () => view('chef.dashboard'))->name('dashboard');
         Route::get('/stats', [StatsController::class, 'index'])->name('stats.index');
 
         Route::prefix('grandprojets')->name('grandprojets.')->group(function () {
-            Route::resource('cpc', GrandProjetCPCController::class)->parameters(['cpc' => 'grandProjet']);
-            Route::get('cpc/{grandProjet}/examens/create', [ExamenController::class, 'create'])->name('cpc.examens.create');
-            Route::post('cpc/{grandProjet}/examens', [ExamenController::class, 'store'])->name('cpc.examens.store');
+
+            /* ----- CPC ----- */
+            Route::resource('cpc', GrandProjetCPCController::class)
+                ->parameters(['cpc' => 'grandProjet']);
+
+            // Examens CPC côté chef
+            Route::get ('cpc/{grandProjet}/examens/create', [ExamenController::class, 'create'])->name('cpc.examens.create');
+            Route::post('cpc/{grandProjet}/examens',        [ExamenController::class, 'store'])->name('cpc.examens.store');
+
+            // Changement d'état CPC (si contrôleur CPC l'expose)
             Route::post('cpc/{grandProjet}/etat', [GrandProjetCPCController::class, 'changerEtat'])->name('cpc.changerEtat');
 
-            // === Complétion Bureau de suivi (côté CHEF) ===
+            // Complétion Bureau de Suivi (CPC)
             Route::get ('cpc/{grandProjet}/complete', [GrandProjetCPCController::class, 'completeForm'])->name('cpc.complete.form');
             Route::put ('cpc/{grandProjet}/complete', [GrandProjetCPCController::class, 'completeStore'])->name('cpc.complete.store');
+
+            /* ----- CLM ----- */
+            Route::resource('clm', GrandProjetCLMController::class)
+                ->parameters(['clm' => 'grandProjet']);
+
+            // Complétion Bureau de Suivi (CLM)
+            Route::get ('clm/{grandProjet}/complete', [GrandProjetCLMController::class, 'completeForm'])->name('clm.complete.form');
+            Route::put ('clm/{grandProjet}/complete', [GrandProjetCLMController::class, 'completeStore'])->name('clm.complete.store');
         });
     });
 
-
-/* ===== GRAND PROJETS (CHEF) ===== */
-Route::middleware(['auth', 'role:chef'])
-    ->prefix('chef/grandprojets')->name('chef.grandprojets.')->group(function () {
-        Route::resource('cpc', GrandProjetCPCController::class)->parameters(['cpc' => 'grandProjet']);
-        Route::get('/stats', [StatsController::class, 'index'])->name('stats.index');
-        Route::resource('clm', GrandProjetCLMController::class);
-        Route::get('cpc/{grandProjet}/examens/create', [ExamenController::class, 'create'])->name('cpc.examens.create');
-        Route::post('cpc/{grandProjet}/examens', [ExamenController::class, 'store'])->name('cpc.examens.store');
-        Route::post('cpc/{grandProjet}/etat', [GrandProjetCPCController::class, 'changerEtat'])->name('cpc.changerEtat');
-    });
-
-/* ===== SAISIE CPC ===== */
+/* =========================================================
+   SAISIE CPC (DASHBOARD + CPC + CLM)
+========================================================= */
 Route::middleware(['auth', 'role:saisie_cpc'])
     ->prefix('saisie_cpc')->name('saisie_cpc.')->group(function () {
+
+        /* Dashboard (liste CPC) */
         Route::get('/dashboard', function () {
             $search   = request('search');
             $dateFrom = request('date_from');
@@ -135,104 +146,176 @@ Route::middleware(['auth', 'role:saisie_cpc'])
             return view('saisie_cpc.dashboard', compact('grandProjets'));
         })->name('dashboard');
 
+        /* ----- CPC côté saisie ----- */
         Route::get('/cpc/create', [GrandProjetCPCController::class, 'create'])->name('cpc.create');
         Route::post('/cpc',       [GrandProjetCPCController::class, 'store'])->name('cpc.store');
         Route::get('/cpc/{grandProjet}',      [GrandProjetCPCController::class, 'show'])->name('cpc.show');
         Route::get('/cpc/{grandProjet}/edit', [GrandProjetCPCController::class, 'edit'])->name('cpc.edit');
         Route::put('/cpc/{grandProjet}',      [GrandProjetCPCController::class, 'update'])->name('cpc.update');
 
-        Route::get('cpc/{grandProjet}/examens/create', [ExamenController::class, 'create'])->name('cpc.examens.create');
-        Route::post('cpc/{grandProjet}/examens',       [ExamenController::class, 'store'])->name('cpc.examens.store');
+        Route::get ('/cpc/{grandProjet}/examens/create', [ExamenController::class, 'create'])->name('cpc.examens.create');
+        Route::post('/cpc/{grandProjet}/examens',        [ExamenController::class, 'store'])->name('cpc.examens.store');
+
+        /* ----- CLM côté saisie (si besoin de saisie CLM) ----- */
+        Route::get ('/clm/create',            [GrandProjetCLMController::class, 'create'])->name('clm.create');
+        Route::post('/clm',                   [GrandProjetCLMController::class, 'store'])->name('clm.store');
+        Route::get ('/clm/{grandProjet}',     [GrandProjetCLMController::class, 'show'])->name('clm.show');
+        Route::get ('/clm/{grandProjet}/edit',[GrandProjetCLMController::class, 'edit'])->name('clm.edit');
+        Route::put ('/clm/{grandProjet}',     [GrandProjetCLMController::class, 'update'])->name('clm.update');
     });
 
-/* ===== DAJF ===== */
+/* =========================================================
+   DAJF — CPC + CLM (UX simplifiée : 2 gros boutons)
+========================================================= */
 Route::middleware(['auth','role:dajf'])
     ->prefix('dajf')->name('dajf.')->group(function () {
 
-        Route::get('/dashboard', fn() => redirect()->route('dajf.inbox'))->name('dashboard');
+        Route::get('/dashboard', fn() => redirect()->route('dajf.inbox', ['type' => 'cpc']))->name('dashboard');
 
+        // À traiter
         Route::get('/inbox', function () {
-            $items = GrandProjet::cpc()
-                ->whereIn('etat', ['enregistrement','transmis_dajf','recu_dajf'])
-                ->latest()->paginate(12);
             $scope = 'inbox';
-            return view('dajf.dashboard', compact('items','scope'));
+            $type  = request('type','cpc'); // 'cpc' | 'clm'
+            $builder = $type === 'clm' ? GrandProjet::clm() : GrandProjet::cpc();
+
+            $items = $builder->whereIn('etat', ['enregistrement','transmis_dajf','recu_dajf'])
+                             ->latest()->paginate(12)->withQueryString();
+
+            $counts = [
+                'cpc_inbox'  => GrandProjet::cpc()->whereIn('etat',['enregistrement','transmis_dajf','recu_dajf'])->count(),
+                'cpc_outbox' => GrandProjet::cpc()->whereIn('etat',['transmis_dgu'])->count(),
+                'clm_inbox'  => GrandProjet::clm()->whereIn('etat',['enregistrement','transmis_dajf','recu_dajf'])->count(),
+                'clm_outbox' => GrandProjet::clm()->whereIn('etat',['transmis_dgu'])->count(),
+            ];
+
+            return view('dajf.dashboard', compact('items','scope','type','counts'));
         })->name('inbox');
 
+        // Envoyés
         Route::get('/outbox', function () {
-            $items = GrandProjet::cpc()
-                ->whereIn('etat', ['transmis_dgu'])
-                ->latest()->paginate(12);
             $scope = 'outbox';
-            return view('dajf.dashboard', compact('items','scope'));
+            $type  = request('type','cpc');
+            $builder = $type === 'clm' ? GrandProjet::clm() : GrandProjet::cpc();
+
+            $items = $builder->whereIn('etat', ['transmis_dgu'])
+                             ->latest()->paginate(12)->withQueryString();
+
+            $counts = [
+                'cpc_inbox'  => GrandProjet::cpc()->whereIn('etat',['enregistrement','transmis_dajf','recu_dajf'])->count(),
+                'cpc_outbox' => GrandProjet::cpc()->whereIn('etat',['transmis_dgu'])->count(),
+                'clm_inbox'  => GrandProjet::clm()->whereIn('etat',['enregistrement','transmis_dajf','recu_dajf'])->count(),
+                'clm_outbox' => GrandProjet::clm()->whereIn('etat',['transmis_dgu'])->count(),
+            ];
+
+            return view('dajf.dashboard', compact('items','scope','type','counts'));
         })->name('outbox');
 
-        // >>> Journalisation ICI <<<
+        /* Transitions CPC */
         Route::post('/cpc/{grandProjet}/transition', function (Request $request, GrandProjet $grandProjet) {
+            abort_unless($grandProjet->type_projet === 'cpc', 404);
             $request->validate(['etat' => 'required|string', 'note' => 'nullable|string']);
-            $from = $grandProjet->etat;
-            $to   = $request->etat;
-
+            $from = $grandProjet->etat; $to = $request->etat;
             $allowed = [
                 'enregistrement' => ['recu_dajf'],
                 'transmis_dajf'  => ['recu_dajf'],
                 'recu_dajf'      => ['transmis_dgu'],
             ];
-            abort_unless(isset($allowed[$from]) && in_array($to, $allowed[$from], true), 403, 'Transition non autorisée pour DAJF.');
-
+            abort_unless(isset($allowed[$from]) && in_array($to, $allowed[$from], true), 403);
             \DB::transaction(function () use ($grandProjet, $from, $to, $request) {
                 $grandProjet->update(['etat' => $to]);
                 \App\Models\FluxEtape::create([
                     'grand_projet_id' => $grandProjet->id,
-                    'from_etat'       => $from,
-                    'to_etat'         => $to,
-                    'happened_at'     => now(),
-                    'by_user'         => auth()->id(),
-                    'note'            => $request->note,
+                    'from_etat' => $from, 'to_etat' => $to,
+                    'happened_at' => now(), 'by_user' => auth()->id(), 'note' => $request->note,
                 ]);
             });
+            return back()->with('success', "DAJF (CPC) : $from → $to");
+        })->name('cpc.transition');
 
-            return back()->with('success', "DAJF : $from → $to");
-        })->name('transition');
+        /* Transitions CLM (mêmes états à ce stade) */
+        Route::post('/clm/{grandProjet}/transition', function (Request $request, GrandProjet $grandProjet) {
+            abort_unless($grandProjet->type_projet === 'clm', 404);
+            $request->validate(['etat' => 'required|string', 'note' => 'nullable|string']);
+            $from = $grandProjet->etat; $to = $request->etat;
+            $allowed = [
+                'enregistrement' => ['recu_dajf'],
+                'transmis_dajf'  => ['recu_dajf'],
+                'recu_dajf'      => ['transmis_dgu'],
+            ];
+            abort_unless(isset($allowed[$from]) && in_array($to, $allowed[$from], true), 403);
+            \DB::transaction(function () use ($grandProjet, $from, $to, $request) {
+                $grandProjet->update(['etat' => $to]);
+                \App\Models\FluxEtape::create([
+                    'grand_projet_id' => $grandProjet->id,
+                    'from_etat' => $from, 'to_etat' => $to,
+                    'happened_at' => now(), 'by_user' => auth()->id(), 'note' => $request->note,
+                ]);
+            });
+            return back()->with('success', "DAJF (CLM) : $from → $to");
+        })->name('clm.transition');
 
-        Route::get('/cpc/{grandProjet}/completer', function (GrandProjet $grandProjet) {
-            return view('dajf.completer', compact('grandProjet'));
-        })->name('cpc.completer');
+        // Compléter (même vue)
+        Route::get('/cpc/{grandProjet}/completer', fn(GrandProjet $grandProjet) => view('dajf.completer', compact('grandProjet')))->name('cpc.completer');
+        Route::get('/clm/{grandProjet}/completer', fn(GrandProjet $grandProjet) => view('dajf.completer', compact('grandProjet')))->name('clm.completer');
     });
 
-/* ===== DGU ===== */
+/* =========================================================
+   DGU — CPC + CLM (UX simplifiée : 2 gros boutons)
+========================================================= */
 Route::middleware(['auth','role:dgu'])
     ->prefix('dgu')->name('dgu.')->group(function () {
 
-        Route::get('/dashboard', fn() => redirect()->route('dgu.inbox'))->name('dashboard');
+        Route::get('/dashboard', fn () => redirect()->route('dgu.inbox', ['type' => 'cpc']))->name('dashboard');
 
+        // À traiter
         Route::get('/inbox', function () {
-            $items = GrandProjet::cpc()
-                ->whereIn('etat', ['transmis_dgu','recu_dgu'])
-                ->latest()->paginate(12);
-            $scope = 'inbox';
-            return view('dgu.dashboard', compact('items','scope'));
+            $scope   = 'inbox';
+            $type    = request('type','cpc'); // 'cpc' | 'clm'
+            $builder = $type === 'clm' ? GrandProjet::clm() : GrandProjet::cpc();
+
+            $items = $builder->whereIn('etat', ['transmis_dgu','recu_dgu'])
+                             ->latest()->paginate(12)->withQueryString();
+
+            $counts = [
+                'cpc_inbox'  => GrandProjet::cpc()->whereIn('etat',['transmis_dgu','recu_dgu'])->count(),
+                'cpc_outbox' => GrandProjet::cpc()->whereIn('etat',['vers_comm_interne'])->count(),
+                'clm_inbox'  => GrandProjet::clm()->whereIn('etat',['transmis_dgu','recu_dgu'])->count(),
+                'clm_outbox' => GrandProjet::clm()->whereIn('etat',['vers_comm_interne'])->count(),
+            ];
+
+            return view('dgu.dashboard', compact('items','scope','type','counts'));
         })->name('inbox');
 
+        // Envoyés
         Route::get('/outbox', function () {
-            $items = GrandProjet::cpc()
-                ->whereIn('etat', ['vers_comm_interne']) // <-- modifié (suivi : ce qui a été transmis vers la commission)
-                ->latest()->paginate(12);
-            $scope = 'outbox';
-            return view('dgu.dashboard', compact('items','scope'));
+            $scope   = 'outbox';
+            $type    = request('type','cpc');
+            $builder = $type === 'clm' ? GrandProjet::clm() : GrandProjet::cpc();
+
+            $items = $builder->whereIn('etat', ['vers_comm_interne'])
+                             ->latest()->paginate(12)->withQueryString();
+
+            $counts = [
+                'cpc_inbox'  => GrandProjet::cpc()->whereIn('etat',['transmis_dgu','recu_dgu'])->count(),
+                'cpc_outbox' => GrandProjet::cpc()->whereIn('etat',['vers_comm_interne'])->count(),
+                'clm_inbox'  => GrandProjet::clm()->whereIn('etat',['transmis_dgu','recu_dgu'])->count(),
+                'clm_outbox' => GrandProjet::clm()->whereIn('etat',['vers_comm_interne'])->count(),
+            ];
+
+            return view('dgu.dashboard', compact('items','scope','type','counts'));
         })->name('outbox');
 
-        // >>> Journalisation ICI <<<
+        /* ----- Transitions CPC (DGU) ----- */
         Route::post('/cpc/{grandProjet}/transition', function (Request $request, GrandProjet $grandProjet) {
+            abort_unless($grandProjet->type_projet === 'cpc', 404);
             $request->validate(['etat' => 'required|string', 'note' => 'nullable|string']);
-            $from = $grandProjet->etat;
-            $to   = $request->etat;
+            $from = $grandProjet->etat; $to = $request->etat;
 
             $allowed = [
-                'transmis_dgu'      => ['recu_dgu'],
-                'recu_dgu'          => ['vers_comm_interne'], // <-- modifié
+                'transmis_dgu' => ['recu_dgu'],
+                'recu_dgu'     => ['vers_comm_interne'],
             ];
-            abort_unless(isset($allowed[$from]) && in_array($to, $allowed[$from], true), 403, 'Transition non autorisée pour DGU.');
+            abort_unless(isset($allowed[$from]) && in_array($to, $allowed[$from], true), 403, 'Transition non autorisée pour DGU (CPC).');
 
             \DB::transaction(function () use ($grandProjet, $from, $to, $request) {
                 $grandProjet->update(['etat' => $to]);
@@ -246,83 +329,154 @@ Route::middleware(['auth','role:dgu'])
                 ]);
             });
 
-            return back()->with('success', "DGU : $from → $to");
-        })->name('transition');
+            return back()->with('success', "DGU (CPC) : $from → $to");
+        })->name('cpc.transition');
 
-        Route::get('/cpc/{grandProjet}/completer', function (GrandProjet $grandProjet) {
-            return view('dgu.completer', compact('grandProjet'));
-        })->name('cpc.completer');
+        /* ----- Transitions CLM (DGU) ----- */
+        Route::post('/clm/{grandProjet}/transition', function (Request $request, GrandProjet $grandProjet) {
+            abort_unless($grandProjet->type_projet === 'clm', 404);
+            $request->validate(['etat' => 'required|string', 'note' => 'nullable|string']);
+            $from = $grandProjet->etat; $to = $request->etat;
+
+            $allowed = [
+                'transmis_dgu' => ['recu_dgu'],
+                'recu_dgu'     => ['vers_comm_interne'],
+            ];
+            abort_unless(isset($allowed[$from]) && in_array($to, $allowed[$from], true), 403, 'Transition non autorisée pour DGU (CLM).');
+
+            \DB::transaction(function () use ($grandProjet, $from, $to, $request) {
+                $grandProjet->update(['etat' => $to]);
+                \App\Models\FluxEtape::create([
+                    'grand_projet_id' => $grandProjet->id,
+                    'from_etat'       => $from,
+                    'to_etat'         => $to,
+                    'happened_at'     => now(),
+                    'by_user'         => auth()->id(),
+                    'note'            => $request->note,
+                ]);
+            });
+
+            return back()->with('success', "DGU (CLM) : $from → $to");
+        })->name('clm.transition');
+
+        // Formulaire "Compléter" (même vue pour CPC/CLM)
+        Route::get('/cpc/{grandProjet}/completer', fn(GrandProjet $grandProjet)
+            => view('dgu.completer', compact('grandProjet')))->name('cpc.completer');
+        Route::get('/clm/{grandProjet}/completer', fn(GrandProjet $grandProjet)
+            => view('dgu.completer', compact('grandProjet')))->name('clm.completer');
     });
 
-/* ===== COMMISSION INTERNE ===== */
+/* =========================================================
+   COMMISSION INTERNE — CPC + CLM (UX simplifiée)
+========================================================= */
 Route::middleware(['auth','role:comm_interne'])
     ->prefix('comm')->name('comm.')->group(function () {
 
-        // Dashboard avec scopes (onglets) + sous-filtre pour la mixte
+        // Dashboard : type=cpc|clm, scope=recevoir|interne|mixte|signature|suivi|tous
         Route::get('/dashboard', function () {
-            $scope = request('scope', 'interne');
+            $type  = request('type','cpc');           // 'cpc' par défaut
+            $scope = request('scope','interne');      // 'interne' par défaut
 
-            // Mapping onglet -> états
             $map = [
-                'recevoir'  => ['vers_comm_interne'],                                 // À recevoir
-                'interne'   => ['comm_interne'],                                      // Commission interne
-                'mixte'     => ['comm_mixte'],                                        // Commission mixte (avec sous-filtre interne favorable/défavorable)
-                'signature' => ['signature_3'],                                       // 3ème signature
-                'suivi'     => ['retour_bs'],                                         // Bureau de suivi
+                'recevoir'  => ['vers_comm_interne'],
+                'interne'   => ['comm_interne'],
+                'mixte'     => ['comm_mixte'],
+                'signature' => ['signature_3'],
+                'suivi'     => ['retour_bs'],
                 'tous'      => ['vers_comm_interne','comm_interne','comm_mixte','signature_3','retour_bs'],
             ];
-            $states = $map[$scope] ?? $map['interne'];
+            $states  = $map[$scope] ?? $map['interne'];
+            $builder = $type === 'clm' ? \App\Models\GrandProjet::clm() : \App\Models\GrandProjet::cpc();
 
-            // Charger examens pour lire l'avis interne
-            $q = \App\Models\GrandProjet::cpc()
-                ->with(['examens' => function($qq){ $qq->orderBy('numero_examen','desc'); }])
+            // Query principale
+            $q = $builder
+                ->with(['examens' => fn($qq) => $qq->orderBy('numero_examen','desc')])
                 ->whereIn('etat', $states)
                 ->latest();
 
-            // Sous-filtre spécifique à "mixte" : ?mixte=to_sig | to_bs | all
+            // Cas spécial : onglet "mixte" avec sous-filtre facultatif ?mixte=to_sig|to_bs|all
             $mixte = request('mixte', 'all');
             if ($scope === 'mixte' && in_array($mixte, ['to_sig','to_bs'], true)) {
                 $items = $q->get()->filter(function($gp) use ($mixte){
                     $lastInterne = $gp->examens->firstWhere('type_examen','interne');
-                    $avis = $lastInterne->avis ?? null; // 'favorable' | 'defavorable' | null
-                    if ($mixte === 'to_sig') return $avis === 'favorable';
-                    if ($mixte === 'to_bs')  return $avis === 'defavorable';
-                    return true;
+                    $avis = $lastInterne->avis ?? null;     // favorable | defavorable | null
+                    return $mixte === 'to_sig' ? $avis === 'favorable'
+                         : ($mixte === 'to_bs'  ? $avis === 'defavorable' : true);
                 });
-                // Paginer "manuellement" après filtre (simple)
                 $items = new \Illuminate\Pagination\LengthAwarePaginator(
-                    $items->values(),
-                    $items->count(),
-                    12,
-                    request('page',1),
-                    ['path' => request()->url(), 'query' => request()->query()]
+                    $items->values(), $items->count(), 12, request('page',1),
+                    ['path'=>request()->url(), 'query'=>request()->query()]
                 );
             } else {
-                $items = $q->paginate(12);
+                $items = $q->paginate(12)->withQueryString();
             }
 
-            return view('comm.dashboard', compact('items','scope','mixte'));
+            // Compteurs pour les gros boutons et les onglets
+            $counts = [
+                'cpc' => [
+                    'recevoir'  => \App\Models\GrandProjet::cpc()->whereIn('etat',$map['recevoir'])->count(),
+                    'interne'   => \App\Models\GrandProjet::cpc()->whereIn('etat',$map['interne'])->count(),
+                    'mixte'     => \App\Models\GrandProjet::cpc()->whereIn('etat',$map['mixte'])->count(),
+                    'signature' => \App\Models\GrandProjet::cpc()->whereIn('etat',$map['signature'])->count(),
+                    'suivi'     => \App\Models\GrandProjet::cpc()->whereIn('etat',$map['suivi'])->count(),
+                ],
+                'clm' => [
+                    'recevoir'  => \App\Models\GrandProjet::clm()->whereIn('etat',$map['recevoir'])->count(),
+                    'interne'   => \App\Models\GrandProjet::clm()->whereIn('etat',$map['interne'])->count(),
+                    'mixte'     => \App\Models\GrandProjet::clm()->whereIn('etat',$map['mixte'])->count(),
+                    'signature' => \App\Models\GrandProjet::clm()->whereIn('etat',$map['signature'])->count(),
+                    'suivi'     => \App\Models\GrandProjet::clm()->whereIn('etat',$map['suivi'])->count(),
+                ],
+            ];
+
+            return view('comm.dashboard', compact('items','type','scope','counts','mixte'));
         })->name('dashboard');
 
-        // Examens (avis interne / mixte)
-        Route::get('/cpc/{grandProjet}/examens/create', [\App\Http\Controllers\ExamenController::class, 'create'])->name('examens.create');
-        Route::post('/cpc/{grandProjet}/examens',       [\App\Http\Controllers\ExamenController::class, 'store'])->name('examens.store');
+        /* ===== Examens (avis interne / mixte) ===== */
+        // CPC
+        Route::get ('/cpc/{grandProjet}/examens/create', [ExamenController::class, 'create'])->name('cpc.examens.create');
+        Route::post('/cpc/{grandProjet}/examens',        [ExamenController::class, 'store'])->name('cpc.examens.store');
+        // CLM
+        Route::get ('/clm/{grandProjet}/examens/create', [ExamenController::class, 'create'])->name('clm.examens.create');
+        Route::post('/clm/{grandProjet}/examens',        [ExamenController::class, 'store'])->name('clm.examens.store');
 
-        // Recevoir (vers_comm_interne -> comm_interne)
-        Route::post('/cpc/{grandProjet}/recevoir', [\App\Http\Controllers\CommissionActionsController::class, 'receive'])->name('recevoir');
+        // >>> ALIAS GÉNÉRIQUES (pour les vues existantes) <<<
+        // /comm/{type}/{grandProjet}/examens/create  => name: comm.examens.create
+        Route::get('/{type}/{grandProjet}/examens/create', function (string $type, GrandProjet $grandProjet) {
+            abort_unless(in_array($type, ['cpc','clm'], true), 404);
+            // optionnel : vérifier la cohérence type <-> modèle
+            abort_unless($grandProjet->type_projet === $type, 404);
+            return app(ExamenController::class)->create($grandProjet);
+        })->whereIn('type', ['cpc','clm'])->name('examens.create');
 
-        // MIXTE : envoyer selon l'avis interne
-        Route::post('/cpc/{grandProjet}/mixte-to-signature', [\App\Http\Controllers\CommissionActionsController::class, 'mixteToSignature'])->name('mixte.toSignature'); // comm_mixte -> signature_3
-        Route::post('/cpc/{grandProjet}/mixte-to-bs',        [\App\Http\Controllers\CommissionActionsController::class, 'mixteToBs'])->name('mixte.toBs');           // comm_mixte -> retour_bs
+        // /comm/{type}/{grandProjet}/examens        => name: comm.examens.store
+        Route::post('/{type}/{grandProjet}/examens', function (Request $request, string $type, GrandProjet $grandProjet) {
+            abort_unless(in_array($type, ['cpc','clm'], true), 404);
+            abort_unless($grandProjet->type_projet === $type, 404);
+            return app(ExamenController::class)->store($request, $grandProjet);
+        })->whereIn('type', ['cpc','clm'])->name('examens.store');
 
-        // 3e signature -> retour_bs
-        Route::post('/cpc/{grandProjet}/marquer-signe', [\App\Http\Controllers\CommissionActionsController::class, 'markSigned'])->name('markSigned');
+        /* ===== Transitions / actions ===== */
+        // CPC
+        Route::post('/cpc/{grandProjet}/recevoir',           [CommissionActionsController::class, 'receive'])->name('cpc.recevoir');
+        Route::post('/cpc/{grandProjet}/mixte-to-signature', [CommissionActionsController::class, 'mixteToSignature'])->name('cpc.mixte.toSignature');
+        Route::post('/cpc/{grandProjet}/mixte-to-bs',        [CommissionActionsController::class, 'mixteToBs'])->name('cpc.mixte.toBs');
+        Route::post('/cpc/{grandProjet}/marquer-signe',      [CommissionActionsController::class, 'markSigned'])->name('cpc.markSigned');
+        Route::post('/cpc/{grandProjet}/archiver',           [CommissionActionsController::class, 'archive'])->name('cpc.archive');
 
-        // Bureau de suivi -> archive
-        Route::post('/cpc/{grandProjet}/archiver', [\App\Http\Controllers\CommissionActionsController::class, 'archive'])->name('archive');
+        // CLM (mêmes méthodes, penser à vérifier $gp->type_projet === 'clm' dans le contrôleur)
+        Route::post('/clm/{grandProjet}/recevoir',           [CommissionActionsController::class, 'receive'])->name('clm.recevoir');
+        Route::post('/clm/{grandProjet}/mixte-to-signature', [CommissionActionsController::class, 'mixteToSignature'])->name('clm.mixte.toSignature');
+        Route::post('/clm/{grandProjet}/mixte-to-bs',        [CommissionActionsController::class, 'mixteToBs'])->name('clm.mixte.toBs');
+        Route::post('/clm/{grandProjet}/marquer-signe',      [CommissionActionsController::class, 'markSigned'])->name('clm.markSigned');
+        Route::post('/clm/{grandProjet}/archiver',           [CommissionActionsController::class, 'archive'])->name('clm.archive');
     });
 
-/* ===== FICHE PARTAGÉE (lecture) ===== */
+/* =========================================================
+   FICHES PARTAGÉES (Lecture seule multi-rôles)
+========================================================= */
 Route::middleware(['auth','role:chef|saisie_cpc|dajf|dgu|comm_interne|super_admin'])
-    ->get('/projets/cpc/{grandProjet}', [GrandProjetCPCController::class, 'show'])
-    ->name('cpc.show.shared');
+    ->group(function () {
+        Route::get('/projets/cpc/{grandProjet}', [GrandProjetCPCController::class, 'show'])->name('cpc.show.shared');
+        Route::get('/projets/clm/{grandProjet}', [GrandProjetCLMController::class, 'show'])->name('clm.show.shared');
+    });

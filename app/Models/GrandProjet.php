@@ -141,4 +141,9 @@ class GrandProjet extends Model
         $idx   = array_search($this->etat, $steps, true);
         return $idx === false ? 0 : $idx;
     }
+    protected $casts = [
+    'categorie_projet' => 'array',
+    'envoi_papier'     => 'boolean',
+];
+
 }

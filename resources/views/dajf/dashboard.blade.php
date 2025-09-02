@@ -3,18 +3,40 @@
 @section('content')
 <div class="container">
 
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h3 class="mb-0">DAJF — Dossiers</h3>
-    <ul class="nav nav-pills">
-      <li class="nav-item">
-        <a class="nav-link {{ (isset($scope) && $scope==='inbox') ? 'active' : '' }}"
-           href="{{ route('dajf.inbox') }}">À traiter</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link {{ (isset($scope) && $scope==='outbox') ? 'active' : '' }}"
-           href="{{ route('dajf.outbox') }}">Envoyés</a>
-      </li>
-    </ul>
+  @php
+    $isInbox = ($scope ?? 'inbox') === 'inbox';
+    $isCpc   = ($type ?? 'cpc') === 'cpc';
+    $title   = 'DAJF — '.($isCpc?'CPC':'CLM').' — '.($isInbox?'À traiter':'Envoyés');
+  @endphp
+
+  <h3 class="mb-3">{{ $title }}</h3>
+
+  {{-- 4 gros boutons très lisibles --}}
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <a href="{{ route('dajf.inbox',  ['type'=>'cpc']) }}" class="btn btn-quick w-100 {{ $isInbox && $isCpc ? 'active' : '' }}">
+        <div class="quick-title">CPC à traiter</div>
+        <div class="quick-count">{{ $counts['cpc_inbox'] ?? '—' }}</div>
+      </a>
+    </div>
+    <div class="col-6 col-md-3">
+      <a href="{{ route('dajf.outbox', ['type'=>'cpc']) }}" class="btn btn-quick w-100 {{ !$isInbox && $isCpc ? 'active' : '' }}">
+        <div class="quick-title">CPC envoyés</div>
+        <div class="quick-count">{{ $counts['cpc_outbox'] ?? '—' }}</div>
+      </a>
+    </div>
+    <div class="col-6 col-md-3">
+      <a href="{{ route('dajf.inbox',  ['type'=>'clm']) }}" class="btn btn-quick w-100 {{ $isInbox && !$isCpc ? 'active' : '' }}">
+        <div class="quick-title">CLM à traiter</div>
+        <div class="quick-count">{{ $counts['clm_inbox'] ?? '—' }}</div>
+      </a>
+    </div>
+    <div class="col-6 col-md-3">
+      <a href="{{ route('dajf.outbox', ['type'=>'clm']) }}" class="btn btn-quick w-100 {{ !$isInbox && !$isCpc ? 'active' : '' }}">
+        <div class="quick-title">CLM envoyés</div>
+        <div class="quick-count">{{ $counts['clm_outbox'] ?? '—' }}</div>
+      </a>
+    </div>
   </div>
 
   @if(session('success'))
@@ -44,38 +66,38 @@
                 <td><strong>{{ $item->numero_dossier }}</strong></td>
                 <td>{{ $item->intitule_projet }}</td>
                 <td>{{ $item->commune_1 }}</td>
-                <td>
-                  <span class="badge bg-secondary">{{ $item->etat }}</span>
-                </td>
+                <td><span class="badge bg-secondary">{{ $item->etat }}</span></td>
                 <td>{{ $item->date_arrivee ? \Carbon\Carbon::parse($item->date_arrivee)->format('d/m/Y') : '-' }}</td>
                 <td class="text-end">
-                  {{-- Compléter (toujours dispo) --}}
-                  <a href="{{ route('dajf.cpc.completer', $item) }}" class="btn btn-info btn-sm me-1">
-                    Compléter
-                  </a>
 
-                  {{-- Prendre en charge (enregistrement/transmis_dajf) --}}
-                  @if($item->etat === 'enregistrement' || $item->etat === 'transmis_dajf')
-                    <form class="d-inline" method="POST" action="{{ route('dajf.transition', $item) }}">
+                  {{-- Compléter --}}
+                  <a href="{{ ($isCpc) ? route('dajf.cpc.completer', $item) : route('dajf.clm.completer', $item) }}"
+                     class="btn btn-info btn-sm me-1">Compléter</a>
+
+                  {{-- Prendre en charge --}}
+                  @if(in_array($item->etat, ['enregistrement','transmis_dajf'], true))
+                    <form class="d-inline" method="POST"
+                          action="{{ $isCpc ? route('dajf.cpc.transition', $item) : route('dajf.clm.transition', $item) }}">
                       @csrf
                       <input type="hidden" name="etat" value="recu_dajf">
-                      <button class="btn btn-primary btn-sm">Marquer reçu (DAJF)</button>
+                      <button class="btn btn-primary btn-sm">Marquer reçu</button>
                     </form>
                   @endif
 
                   {{-- Envoyer DGU --}}
                   @if($item->etat === 'recu_dajf')
-                    <form class="d-inline" method="POST" action="{{ route('dajf.transition', $item) }}">
+                    <form class="d-inline" method="POST"
+                          action="{{ $isCpc ? route('dajf.cpc.transition', $item) : route('dajf.clm.transition', $item) }}">
                       @csrf
                       <input type="hidden" name="etat" value="transmis_dgu">
                       <button class="btn btn-outline-dark btn-sm">Transmettre DGU</button>
                     </form>
                   @endif
 
-                  {{-- Détails ouverts à tous les rôles --}}
-                  <a class="btn btn-link btn-sm" href="{{ route('cpc.show.shared', $item) }}" target="_blank">
-    Détails
-</a>
+                  {{-- Détails (fiche partagée) --}}
+                  <a class="btn btn-link btn-sm"
+                     href="{{ $isCpc ? route('cpc.show.shared', $item) : route('clm.show.shared', $item) }}"
+                     target="_blank">Détails</a>
 
                 </td>
               </tr>
@@ -93,4 +115,18 @@
     <div class="alert alert-info">Aucun dossier.</div>
   @endif
 </div>
+
+{{-- Styles simples pour gros boutons lisibles --}}
+<style>
+.btn-quick{
+  display:block; text-align:left; border:2px solid #0d6efd; border-radius:14px;
+  padding:18px 16px; background:#fff; color:#0d6efd; transition:all .15s;
+  font-weight:700;
+}
+.btn-quick .quick-title{ font-size:1.05rem; opacity:.9; }
+.btn-quick .quick-count{ font-size:1.8rem; line-height:1; margin-top:6px; }
+.btn-quick:hover{ background:#e7f1ff; text-decoration:none; }
+.btn-quick.active{ background:#0d6efd; color:#fff; }
+.btn-quick.active .quick-count{ color:#fff; }
+</style>
 @endsection

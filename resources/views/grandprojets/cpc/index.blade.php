@@ -11,7 +11,7 @@
     </a>
   </div>
 
-  {{-- ===== Styles lisibilité états + ligne défavorable ===== --}}
+  {{-- ===== Styles lisibilité états + ligne défavorable + lignes cliquables ===== --}}
   <style>
     /* Soft, readable state chips */
     .chip-state{
@@ -35,15 +35,21 @@
     .chip-soft-warning   .dot{ background:#ffc107 }
     .chip-soft-dark      .dot{ background:#343a40 }
     .chip-soft-success   .dot{ background:#198754 }
-    .chip-soft-light    .dot{ background:#adb5bd }
+    .chip-soft-light     .dot{ background:#adb5bd }
 
     /* Ligne rouge claire pour défavorable + retour_bs */
     .row-defav-retourbs { background:#fdeaea !important; }
+
+    /* Lignes cliquables */
+    .clickable-row { cursor:pointer; }
+    .clickable-row:hover { background:#f7f9fc !important; }
+    /* Évite l'effet "pointer" sur les éléments interactifs internes */
+    .clickable-row .no-row-nav { cursor:default; }
   </style>
 
   {{-- ===== Filtres ===== --}}
   @php
-    // Options d'états affichables (libellés côté UI)
+    // Options d'états (libellés UI)
     $etatsOptions = $etatsOptions
       ?? [
         'transmis_dajf'     => 'Saisie',
@@ -165,9 +171,13 @@
                   'archive'           => ['label' => 'Archivé',          'class' => 'chip-soft-success'],
                 ];
                 $meta = $stateMap[$item->etat] ?? ['label' => $item->etat, 'class' => 'chip-soft-light'];
+
+                // URL de détails (ligne cliquable)
+                $detailsUrl = route('cpc.show.shared', $item);
               @endphp
 
-              <tr class="{{ $isDefavorableRetourBS ? 'row-defav-retourbs' : '' }}">
+              <tr class="clickable-row {{ $isDefavorableRetourBS ? 'row-defav-retourbs' : '' }}"
+                  data-href="{{ $detailsUrl }}">
                 <td>{{ $grandProjets->firstItem() + $i }}</td>
                 <td><strong>{{ $item->numero_dossier }}</strong></td>
                 <td>{{ $item->intitule_projet }}</td>
@@ -178,32 +188,21 @@
                   <span class="chip-state {{ $meta['class'] }}">
                     <span class="dot"></span> {{ $meta['label'] }}
                   </span>
-                  <!-- {{-- Affiche un petit tag "Défavorable" si c'est le cas (lisible aussi) --}}
-                  @if(optional($item->lastExamen)->avis === 'defavorable')
-                    <span class="chip-state chip-soft-warning ms-1">
-                      <span class="dot"></span> Avis défavorable
-                    </span>
-                  @elseif(optional($item->lastExamen)->avis === 'favorable')
-                    <span class="chip-state chip-soft-success ms-1">
-                      <span class="dot"></span> Avis favorable
-                    </span>
-                  @endif -->
                 </td>
 
                 <td>{{ $item->date_arrivee ? \Carbon\Carbon::parse($item->date_arrivee)->format('d/m/Y') : '-' }}</td>
 
                 <td class="text-end">
-                  <a href="{{ route('cpc.show.shared', $item) }}" class="btn btn-sm btn-outline-secondary" target="_blank">
-                    Détails
-                  </a>
-                  <a href="{{ route('chef.grandprojets.cpc.edit', $item) }}" class="btn btn-sm btn-outline-primary">
+                  {{-- IMPORTANT: class no-row-nav pour ne pas déclencher la navigation de ligne --}}
+                  <a href="{{ route('chef.grandprojets.cpc.edit', $item) }}"
+                     class="btn btn-sm btn-outline-primary no-row-nav">
                     Éditer
                   </a>
 
                   {{-- Bouton "Compléter" seulement si retour_bs + favorable (et si le helper existe) --}}
                   @if(method_exists($item,'canBeCompletedByBS') && $item->canBeCompletedByBS())
                     <a href="{{ route('chef.grandprojets.cpc.complete.form', $item) }}"
-                       class="btn btn-sm btn-success">
+                       class="btn btn-sm btn-success no-row-nav">
                       Compléter
                     </a>
                   @endif
@@ -222,4 +221,18 @@
     <div class="alert alert-info">Aucun dossier trouvé.</div>
   @endif
 </div>
+
+{{-- JS: rend les lignes cliquables, et ignore clics sur éléments .no-row-nav --}}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('tr.clickable-row').forEach(function (row) {
+    row.addEventListener('click', function (e) {
+      if (e.target.closest('.no-row-nav')) return;
+      const href = this.getAttribute('data-href');
+      if (href) window.location.href = href; // same tab
+    });
+  });
+});
+
+</script>
 @endsection
