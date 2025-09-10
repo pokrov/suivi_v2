@@ -8,16 +8,11 @@
     $isCpc   = ($type ?? 'cpc') === 'cpc';
     $title   = 'DAJF — '.($isCpc?'CPC':'CLM').' — '.($isInbox?'À traiter':'Envoyés');
 
-    // pour construire les URLs de “Mes / Tous”
     $baseRoute = $isInbox ? 'dajf.inbox' : 'dajf.outbox';
-    $qsCpcMine = fn($mine) => route($baseRoute, ['type'=>'cpc','mine'=>$mine]);
-    $qsClmMine = fn($mine) => route($baseRoute, ['type'=>'clm','mine'=>$mine]);
     $mineCur   = request('mine','1') === '1';
   @endphp
-
   <h3 class="mb-3">{{ $title }}</h3>
 
-  {{-- 4 gros boutons très lisibles --}}
   <div class="row g-3 mb-3">
     <div class="col-6 col-md-3">
       <a href="{{ route('dajf.inbox',  ['type'=>'cpc','mine'=>$mineCur?1:0]) }}" class="btn-quick w-100 {{ $isInbox && $isCpc ? 'active' : '' }}">
@@ -45,7 +40,6 @@
     </div>
   </div>
 
-  {{-- bascule Mes / Tous --}}
   <div class="d-flex justify-content-end mb-3">
     <div class="btn-group" role="group" aria-label="Filtre propriétaire">
       <a href="{{ route($baseRoute, ['type'=>$isCpc?'cpc':'clm','mine'=>1]) }}"
@@ -98,7 +92,7 @@
                   <a href="{{ $isCpc ? route('dajf.cpc.completer', $item) : route('dajf.clm.completer', $item) }}"
                      class="btn btn-info btn-sm me-1">Compléter</a>
 
-                  {{-- Prendre en charge (enregistrement / transmis_dajf) --}}
+                  {{-- Prendre en charge --}}
                   @if(in_array($item->etat, ['enregistrement','transmis_dajf'], true))
                     <form class="d-inline" method="POST"
                           action="{{ $isCpc ? route('dajf.cpc.transition', $item) : route('dajf.clm.transition', $item) }}">
@@ -108,17 +102,25 @@
                     </form>
                   @endif
 
-                  {{-- Envoyer DGU --}}
+                  {{-- Envoyer DGU (avec assignation obligatoire) --}}
                   @if($item->etat === 'recu_dajf')
                     <form class="d-inline" method="POST"
                           action="{{ $isCpc ? route('dajf.cpc.transition', $item) : route('dajf.clm.transition', $item) }}">
                       @csrf
                       <input type="hidden" name="etat" value="transmis_dgu">
+
+                      <select name="assigned_dgu_id" class="form-select form-select-sm d-inline w-auto me-1" required>
+                        <option value="">— Choisir agent DGU —</option>
+                        @foreach(($dguUsers ?? collect()) as $u)
+                          <option value="{{ $u->id }}">{{ $u->name }}</option>
+                        @endforeach
+                      </select>
+
                       <button class="btn btn-outline-dark btn-sm">Transmettre DGU</button>
                     </form>
                   @endif
 
-                  {{-- Détails (fiche partagée) --}}
+                  {{-- Détails --}}
                   <a class="btn btn-link btn-sm"
                      href="{{ $isCpc ? route('cpc.show.shared', $item) : route('clm.show.shared', $item) }}"
                      target="_blank">Détails</a>
@@ -140,7 +142,6 @@
   @endif
 </div>
 
-{{-- Styles pour gros boutons lisibles --}}
 <style>
 .btn-quick{
   display:block; text-align:left; border:2px solid #0d6efd; border-radius:14px;

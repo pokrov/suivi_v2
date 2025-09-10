@@ -51,6 +51,48 @@
       </div>
     </div>
   </div>
+  {{-- Bloc Rokhas : ouvrir + rechercher la réf (basé sur GED) --}}
+@if(!empty($grandProjet->ged))
+  <div class="content pt-0">
+    <div class="card shadow-sm mb-3">
+      <div class="card-header bg-white">
+        <strong><i class="fas fa-link text-primary me-2"></i>Rokhas</strong>
+      </div>
+      <div class="card-body d-flex flex-wrap align-items-center gap-2">
+        <a class="btn btn-primary btn-sm"
+           href="https://urbas.rokhas.ma/karazal/index.jsp"
+           target="_blank" rel="noopener">
+          Ouvrir Rokhas
+        </a>
+
+        <a class="btn btn-outline-secondary btn-sm"
+           href="javascript:(function(){
+             var ref='{{ addslashes($grandProjet->ged) }}';
+             var go=function(){
+               try{
+                 /* ⚠️ À AJUSTER avec les vrais sélecteurs Rokhas */
+                 var input=document.querySelector('input[name=\"reference\"], input#reference, input[name=\"numeroDossier\"]');
+                 var btn=document.querySelector('button[type=\"submit\"], .search-btn');
+                 if(input){ input.value=ref; input.dispatchEvent(new Event('input',{bubbles:true})); }
+                 if(btn){ btn.click(); }
+               }catch(e){ console.log('Rokhas helper:', e); }
+             };
+             if(location.hostname.indexOf('rokhas.ma')===-1){
+               window.open('https://urbas.rokhas.ma/karazal/index.jsp','_blank');
+               setTimeout(go,1500);
+             }else{ go(); }
+           })();">
+          Rechercher ce dossier
+        </a>
+
+        <span class="text-muted">Réf. Rokhas : <strong>{{ $grandProjet->ged }}</strong></span>
+      </div>
+      <div class="card-footer small text-muted">
+        Astuce : si Rokhas demande la 2FA, connectez-vous puis recliquez “Rechercher ce dossier”.
+      </div>
+    </div>
+  </div>
+@endif
 
   {{-- Infos --}}
   <div class="row g-4">

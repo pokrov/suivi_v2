@@ -178,7 +178,7 @@ Route::middleware(['auth', 'role:saisie_cpc'])
     });
 
 /* =========================================================
-   DAJF — CPC + CLM (UX simplifiée : 2 gros boutons)
+   DAJF — CPC + CLM (avec assignation DGU à l’envoi)
 ========================================================= */
 Route::middleware(['auth','role:dajf'])
     ->prefix('dajf')->name('dajf.')->group(function () {
@@ -190,15 +190,12 @@ Route::middleware(['auth','role:dajf'])
         Route::get('/inbox', function () {
             $scope   = 'inbox';
             $type    = request('type','cpc');              // 'cpc' | 'clm'
-            $mine    = request('mine','1') === '1';        // 1 = mes dossiers (par défaut)
+            $mine    = request('mine','1') === '1';        // 1 = mes dossiers
             $authId  = auth()->id();
 
             $builder = $type === 'clm' ? GrandProjet::clm() : GrandProjet::cpc();
-
-            // À traiter côté DAJF
             $q = $builder->whereIn('etat', ['enregistrement','transmis_dajf','recu_dajf']);
 
-            // Si "mes dossiers" → non affectés OU affectés à moi
             if ($mine) {
                 $q->where(function($qq) use ($authId){
                     $qq->whereNull('assigned_dajf_id')
@@ -208,7 +205,6 @@ Route::middleware(['auth','role:dajf'])
 
             $items = $q->latest()->paginate(12)->withQueryString();
 
-            // Compteurs pour les gros boutons
             $counts = [
                 'cpc_inbox'  => GrandProjet::cpc()->whereIn('etat',['enregistrement','transmis_dajf','recu_dajf'])->count(),
                 'cpc_outbox' => GrandProjet::cpc()->whereIn('etat',['transmis_dgu'])->count(),
@@ -216,28 +212,26 @@ Route::middleware(['auth','role:dajf'])
                 'clm_outbox' => GrandProjet::clm()->whereIn('etat',['transmis_dgu'])->count(),
             ];
 
-            return view('dajf.dashboard', compact('items','scope','type','counts'));
+            // liste des agents DGU pour l’assignation
+            $dguUsers = \App\Models\User::role('dgu')->orderBy('name')->get(['id','name']);
+
+            return view('dajf.dashboard', compact('items','scope','type','counts','dguUsers'));
         })->name('inbox');
 
         // ===== ENVOYÉS =====
         Route::get('/outbox', function () {
             $scope   = 'outbox';
-            $type    = request('type','cpc');              // 'cpc' | 'clm'
-            $mine    = request('mine','1') === '1';        // 1 = mes dossiers (par défaut)
+            $type    = request('type','cpc');
+            $mine    = request('mine','1') === '1';
             $authId  = auth()->id();
 
             $builder = $type === 'clm' ? GrandProjet::clm() : GrandProjet::cpc();
-
-            // Envoyés par DAJF → vers DGU
             $q = $builder->whereIn('etat', ['transmis_dgu']);
 
-            if ($mine) {
-                $q->where('assigned_dajf_id', $authId);
-            }
+            if ($mine) $q->where('assigned_dajf_id', $authId);
 
             $items = $q->latest()->paginate(12)->withQueryString();
 
-            // Compteurs pour les gros boutons
             $counts = [
                 'cpc_inbox'  => GrandProjet::cpc()->whereIn('etat',['enregistrement','transmis_dajf','recu_dajf'])->count(),
                 'cpc_outbox' => GrandProjet::cpc()->whereIn('etat',['transmis_dgu'])->count(),
@@ -245,44 +239,20 @@ Route::middleware(['auth','role:dajf'])
                 'clm_outbox' => GrandProjet::clm()->whereIn('etat',['transmis_dgu'])->count(),
             ];
 
-            return view('dajf.dashboard', compact('items','scope','type','counts'));
+            $dguUsers = \App\Models\User::role('dgu')->orderBy('name')->get(['id','name']);
+
+            return view('dajf.dashboard', compact('items','scope','type','counts','dguUsers'));
         })->name('outbox');
 
         /* ===== Transitions CPC ===== */
         Route::post('/cpc/{grandProjet}/transition', function (Request $request, GrandProjet $grandProjet) {
             abort_unless($grandProjet->type_projet === 'cpc', 404);
-            $request->validate(['etat' => 'required|string', 'note' => 'nullable|string']);
 
-            $from = $grandProjet->etat;
-            $to   = $request->etat;
-
-            $allowed = [
-                'enregistrement' => ['recu_dajf'],   // prise en charge
-                'transmis_dajf'  => ['recu_dajf'],   // idem si déjà transmis par Chef
-                'recu_dajf'      => ['transmis_dgu'] // après traitement → vers DGU
-            ];
-            abort_unless(isset($allowed[$from]) && in_array($to, $allowed[$from], true), 403, 'Transition non autorisée.');
-
-            \DB::transaction(function () use ($grandProjet, $from, $to, $request) {
-                $grandProjet->update(['etat' => $to]);
-
-                \App\Models\FluxEtape::create([
-                    'grand_projet_id' => $grandProjet->id,
-                    'from_etat'       => $from,
-                    'to_etat'         => $to,
-                    'happened_at'     => now(),
-                    'by_user'         => auth()->id(),
-                    'note'            => $request->note,
-                ]);
-            });
-
-            return back()->with('success', "DAJF (CPC) : $from → $to");
-        })->name('cpc.transition');
-
-        /* ===== Transitions CLM ===== */
-        Route::post('/clm/{grandProjet}/transition', function (Request $request, GrandProjet $grandProjet) {
-            abort_unless($grandProjet->type_projet === 'clm', 404);
-            $request->validate(['etat' => 'required|string', 'note' => 'nullable|string']);
+            $request->validate([
+                'etat'            => 'required|string|in:recu_dajf,transmis_dgu',
+                'note'            => 'nullable|string',
+                'assigned_dgu_id' => 'nullable|integer|exists:users,id',
+            ]);
 
             $from = $grandProjet->etat;
             $to   = $request->etat;
@@ -294,8 +264,26 @@ Route::middleware(['auth','role:dajf'])
             ];
             abort_unless(isset($allowed[$from]) && in_array($to, $allowed[$from], true), 403, 'Transition non autorisée.');
 
+            // si transmission vers DGU => assignation obligatoire + rôle DGU
+            if ($to === 'transmis_dgu') {
+                $assigneeId = $request->integer('assigned_dgu_id');
+                abort_unless($assigneeId, 422, 'Veuillez choisir un agent DGU.');
+                $assignee = \App\Models\User::where('id', $assigneeId)->role('dgu')->first();
+                abort_unless($assignee, 422, 'L’utilisateur choisi n’a pas le rôle DGU.');
+            }
+
             \DB::transaction(function () use ($grandProjet, $from, $to, $request) {
-                $grandProjet->update(['etat' => $to]);
+                $payload = ['etat' => $to];
+
+                if ($to === 'transmis_dgu') {
+                    $payload['assigned_dgu_id'] = $request->integer('assigned_dgu_id');
+                    $payload['assigned_dgu_at'] = now();
+                }
+
+                $grandProjet->update(array_merge($payload, [
+                    'assigned_dajf_id' => auth()->id(),              // on garde la traçabilité DAJF
+                    'assigned_dajf_at' => $grandProjet->assigned_dajf_at ?? now(),
+                ]));
 
                 \App\Models\FluxEtape::create([
                     'grand_projet_id' => $grandProjet->id,
@@ -303,7 +291,60 @@ Route::middleware(['auth','role:dajf'])
                     'to_etat'         => $to,
                     'happened_at'     => now(),
                     'by_user'         => auth()->id(),
-                    'note'            => $request->note,
+                    'note'            => $request->note ?? ($to === 'transmis_dgu' ? 'Transmission vers DGU avec assignation.' : null),
+                ]);
+            });
+
+            return back()->with('success', "DAJF (CPC) : $from → $to");
+        })->name('cpc.transition');
+
+        /* ===== Transitions CLM ===== */
+        Route::post('/clm/{grandProjet}/transition', function (Request $request, GrandProjet $grandProjet) {
+            abort_unless($grandProjet->type_projet === 'clm', 404);
+
+            $request->validate([
+                'etat'            => 'required|string|in:recu_dajf,transmis_dgu',
+                'note'            => 'nullable|string',
+                'assigned_dgu_id' => 'nullable|integer|exists:users,id',
+            ]);
+
+            $from = $grandProjet->etat;
+            $to   = $request->etat;
+
+            $allowed = [
+                'enregistrement' => ['recu_dajf'],
+                'transmis_dajf'  => ['recu_dajf'],
+                'recu_dajf'      => ['transmis_dgu'],
+            ];
+            abort_unless(isset($allowed[$from]) && in_array($to, $allowed[$from], true), 403, 'Transition non autorisée.');
+
+            if ($to === 'transmis_dgu') {
+                $assigneeId = $request->integer('assigned_dgu_id');
+                abort_unless($assigneeId, 422, 'Veuillez choisir un agent DGU.');
+                $assignee = \App\Models\User::where('id', $assigneeId)->role('dgu')->first();
+                abort_unless($assignee, 422, 'L’utilisateur choisi n’a pas le rôle DGU.');
+            }
+
+            \DB::transaction(function () use ($grandProjet, $from, $to, $request) {
+                $payload = ['etat' => $to];
+
+                if ($to === 'transmis_dgu') {
+                    $payload['assigned_dgu_id'] = $request->integer('assigned_dgu_id');
+                    $payload['assigned_dgu_at'] = now();
+                }
+
+                $grandProjet->update(array_merge($payload, [
+                    'assigned_dajf_id' => auth()->id(),
+                    'assigned_dajf_at' => $grandProjet->assigned_dajf_at ?? now(),
+                ]));
+
+                \App\Models\FluxEtape::create([
+                    'grand_projet_id' => $grandProjet->id,
+                    'from_etat'       => $from,
+                    'to_etat'         => $to,
+                    'happened_at'     => now(),
+                    'by_user'         => auth()->id(),
+                    'note'            => $request->note ?? ($to === 'transmis_dgu' ? 'Transmission vers DGU avec assignation.' : null),
                 ]);
             });
 
@@ -316,8 +357,9 @@ Route::middleware(['auth','role:dajf'])
         Route::get('/clm/{grandProjet}/completer', fn(GrandProjet $grandProjet)
             => view('dajf.completer', compact('grandProjet')))->name('clm.completer');
     });
+
 /* =========================================================
-   DGU — CPC + CLM (UX simplifiée : 2 gros boutons)
+   DGU — CPC + CLM (seul l’assigné peut traiter)
 ========================================================= */
 Route::middleware(['auth','role:dgu'])
     ->prefix('dgu')->name('dgu.')->group(function () {
@@ -325,54 +367,88 @@ Route::middleware(['auth','role:dgu'])
         Route::get('/dashboard', fn () => redirect()->route('dgu.inbox', ['type' => 'cpc']))->name('dashboard');
 
         // À traiter
-        Route::get('/inbox', function () {
-            $scope   = 'inbox';
-            $type    = request('type','cpc'); // 'cpc' | 'clm'
-            $builder = $type === 'clm' ? GrandProjet::clm() : GrandProjet::cpc();
+        // À traiter
+Route::get('/inbox', function () {
+    $scope   = 'inbox';
+    $type    = request('type','cpc');
+    $builder = $type === 'clm' ? GrandProjet::clm() : GrandProjet::cpc();
 
-            $items = $builder->whereIn('etat', ['transmis_dgu','recu_dgu'])
-                             ->latest()->paginate(12)->withQueryString();
+    $uid = auth()->id();
+    $isPrivileged = auth()->user()->hasAnyRole(['chef','super_admin']);
 
-            $counts = [
-                'cpc_inbox'  => GrandProjet::cpc()->whereIn('etat',['transmis_dgu','recu_dgu'])->count(),
-                'cpc_outbox' => GrandProjet::cpc()->whereIn('etat',['vers_comm_interne'])->count(),
-                'clm_inbox'  => GrandProjet::clm()->whereIn('etat',['transmis_dgu','recu_dgu'])->count(),
-                'clm_outbox' => GrandProjet::clm()->whereIn('etat',['vers_comm_interne'])->count(),
-            ];
+    // Etats visibles en inbox DGU
+    $q = $builder->whereIn('etat', ['transmis_dgu','recu_dgu']);
 
-            return view('dgu.dashboard', compact('items','scope','type','counts'));
-        })->name('inbox');
+    // 🔒 Filtre: si pas "chef/super_admin", ne montrer que les dossiers assignés à CET agent DGU
+    if (!$isPrivileged) {
+        $q->where('assigned_dgu_id', $uid);
+    }
+
+    $items = $q->latest()->paginate(12)->withQueryString();
+
+    $counts = [
+        'cpc_inbox'  => GrandProjet::cpc()->whereIn('etat',['transmis_dgu','recu_dgu'])->count(),
+        'cpc_outbox' => GrandProjet::cpc()->whereIn('etat',['vers_comm_interne'])->count(),
+        'clm_inbox'  => GrandProjet::clm()->whereIn('etat',['transmis_dgu','recu_dgu'])->count(),
+        'clm_outbox' => GrandProjet::clm()->whereIn('etat',['vers_comm_interne'])->count(),
+    ];
+
+    return view('dgu.dashboard', compact('items','scope','type','counts'));
+})->name('inbox');
 
         // Envoyés
-        Route::get('/outbox', function () {
-            $scope   = 'outbox';
-            $type    = request('type','cpc');
-            $builder = $type === 'clm' ? GrandProjet::clm() : GrandProjet::cpc();
+        // Envoyés
+Route::get('/outbox', function () {
+    $scope   = 'outbox';
+    $type    = request('type','cpc');
+    $builder = $type === 'clm' ? GrandProjet::clm() : GrandProjet::cpc();
 
-            $items = $builder->whereIn('etat', ['vers_comm_interne'])
-                             ->latest()->paginate(12)->withQueryString();
+    $uid = auth()->id();
+    $isPrivileged = auth()->user()->hasAnyRole(['chef','super_admin']);
 
-            $counts = [
-                'cpc_inbox'  => GrandProjet::cpc()->whereIn('etat',['transmis_dgu','recu_dgu'])->count(),
-                'cpc_outbox' => GrandProjet::cpc()->whereIn('etat',['vers_comm_interne'])->count(),
-                'clm_inbox'  => GrandProjet::clm()->whereIn('etat',['transmis_dgu','recu_dgu'])->count(),
-                'clm_outbox' => GrandProjet::clm()->whereIn('etat',['vers_comm_interne'])->count(),
-            ];
+    // Etats "envoyés" côté DGU
+    $q = $builder->whereIn('etat', ['vers_comm_interne']);
 
-            return view('dgu.dashboard', compact('items','scope','type','counts'));
-        })->name('outbox');
+    // 🔒 Même principe: si pas "chef/super_admin", ne montrer que ce qui lui était assigné
+    if (!$isPrivileged) {
+        $q->where('assigned_dgu_id', $uid);
+    }
+
+    $items = $q->latest()->paginate(12)->withQueryString();
+
+    $counts = [
+        'cpc_inbox'  => GrandProjet::cpc()->whereIn('etat',['transmis_dgu','recu_dgu'])->count(),
+        'cpc_outbox' => GrandProjet::cpc()->whereIn('etat',['vers_comm_interne'])->count(),
+        'clm_inbox'  => GrandProjet::clm()->whereIn('etat',['transmis_dgu','recu_dgu'])->count(),
+        'clm_outbox' => GrandProjet::clm()->whereIn('etat',['vers_comm_interne'])->count(),
+    ];
+
+    return view('dgu.dashboard', compact('items','scope','type','counts'));
+})->name('outbox');
+
 
         /* ----- Transitions CPC (DGU) ----- */
         Route::post('/cpc/{grandProjet}/transition', function (Request $request, GrandProjet $grandProjet) {
             abort_unless($grandProjet->type_projet === 'cpc', 404);
-            $request->validate(['etat' => 'required|string', 'note' => 'nullable|string']);
-            $from = $grandProjet->etat; $to = $request->etat;
+
+            $request->validate([
+                'etat' => 'required|string|in:recu_dgu,vers_comm_interne',
+                'note' => 'nullable|string',
+            ]);
+
+            $from = $grandProjet->etat; 
+            $to   = $request->etat;
 
             $allowed = [
                 'transmis_dgu' => ['recu_dgu'],
                 'recu_dgu'     => ['vers_comm_interne'],
             ];
             abort_unless(isset($allowed[$from]) && in_array($to, $allowed[$from], true), 403, 'Transition non autorisée pour DGU (CPC).');
+
+            // 🔒 seul l’agent assigné (ou Chef / Super Admin)
+            $uid = auth()->id();
+            $isPrivileged = auth()->user()->hasAnyRole(['chef','super_admin']);
+            abort_unless($isPrivileged || $grandProjet->assigned_dgu_id === $uid, 403, 'Ce dossier est assigné à un autre agent DGU.');
 
             \DB::transaction(function () use ($grandProjet, $from, $to, $request) {
                 $grandProjet->update(['etat' => $to]);
@@ -392,14 +468,24 @@ Route::middleware(['auth','role:dgu'])
         /* ----- Transitions CLM (DGU) ----- */
         Route::post('/clm/{grandProjet}/transition', function (Request $request, GrandProjet $grandProjet) {
             abort_unless($grandProjet->type_projet === 'clm', 404);
-            $request->validate(['etat' => 'required|string', 'note' => 'nullable|string']);
-            $from = $grandProjet->etat; $to = $request->etat;
+
+            $request->validate([
+                'etat' => 'required|string|in:recu_dgu,vers_comm_interne',
+                'note' => 'nullable|string',
+            ]);
+
+            $from = $grandProjet->etat; 
+            $to   = $request->etat;
 
             $allowed = [
                 'transmis_dgu' => ['recu_dgu'],
                 'recu_dgu'     => ['vers_comm_interne'],
             ];
             abort_unless(isset($allowed[$from]) && in_array($to, $allowed[$from], true), 403, 'Transition non autorisée pour DGU (CLM).');
+
+            $uid = auth()->id();
+            $isPrivileged = auth()->user()->hasAnyRole(['chef','super_admin']);
+            abort_unless($isPrivileged || $grandProjet->assigned_dgu_id === $uid, 403, 'Ce dossier est assigné à un autre agent DGU.');
 
             \DB::transaction(function () use ($grandProjet, $from, $to, $request) {
                 $grandProjet->update(['etat' => $to]);
@@ -422,6 +508,7 @@ Route::middleware(['auth','role:dgu'])
         Route::get('/clm/{grandProjet}/completer', fn(GrandProjet $grandProjet)
             => view('dgu.completer', compact('grandProjet')))->name('clm.completer');
     });
+
 
 /* =========================================================
    COMMISSION INTERNE — CPC + CLM (UX simplifiée)

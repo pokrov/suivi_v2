@@ -50,10 +50,10 @@
                      name="numero_dossier"
                      value="{{ old('numero_dossier') }}"
                      class="form-control @error('numero_dossier') is-invalid @enderror"
-                     placeholder="ex: 1234/2025 (Chiffres/20XX)"
+                     placeholder="ex: 1234/25 (Chiffres/20XX)"
                      required>
               @error('numero_dossier') <div class="invalid-feedback">{{ $message }}</div> @enderror
-              <div class="form-text">Format attendu : <code>nombre/20XX</code> (ex. 452/2025)</div>
+              <div class="form-text">Format: nombre/AA, ex: 452/25</div>
             </div>
 
             {{-- Province --}}

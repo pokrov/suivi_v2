@@ -62,7 +62,7 @@ class GrandProjetCLMController extends Controller
     {
         $data = $request->validate([
             // Requis
-            'numero_dossier'           => ['required','string','max:50', Rule::unique('grand_projets','numero_dossier')],
+            'numero_dossier'           => ['required','string','max:50','regex:/^\d+\/\d{2}$/', Rule::unique('grand_projets','numero_dossier')],
             'province'                 => ['required','string','max:120'],
             'commune_1'                => ['required','string','max:120'],
             'date_arrivee'             => ['required','date'],
@@ -153,7 +153,7 @@ class GrandProjetCLMController extends Controller
 
         $data = $request->validate([
             // Requis
-            'numero_dossier'           => ['required','string','max:50', Rule::unique('grand_projets','numero_dossier')->ignore($grandProjet->id)],
+            'numero_dossier'           => ['required','string','max:50', 'regex:/^\d+\/\d{2}$/',Rule::unique('grand_projets','numero_dossier')->ignore($grandProjet->id)],
             'province'                 => ['required','string','max:120'],
             'commune_1'                => ['required','string','max:120'],
             'date_arrivee'             => ['required','date'],

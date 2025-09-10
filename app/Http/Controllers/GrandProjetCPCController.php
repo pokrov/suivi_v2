@@ -76,26 +76,26 @@ class GrandProjetCPCController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'numero_dossier'          => ['required', 'regex:/^\d+\/20\d{2}$/'],
-            'numero_arrivee'          => ['nullable', 'string', 'max:50'],
-            'province'                => 'required|string',
-            'commune_1'               => 'required|string',
-            'date_arrivee'            => 'required|date',
-            'petitionnaire'           => 'required|string',
-            'categorie_petitionnaire' => 'required|string',
-            'intitule_projet'         => 'required|string',
-            'categorie_projet'        => 'required|string|in:Commerce,Culte,Equipement de proximité,équipement public,équipement privé,Immeuble,projet agricole,Projet Industriel,Projet touristique,R+1,R+2,RDC,Services,Villa,Autre',
-            'contexte_projet'         => 'required|string',
-            'maitre_oeuvre'           => 'required|string',
-            'situation'               => 'required|string',
-            'reference_fonciere'      => 'required|string',
-            'reference_envoi'         => 'nullable|string',
-            'numero_envoi'            => 'nullable|string',
-            'lien_ged'                => 'nullable|url',
-            'observations'            => 'nullable|string',
-            'proprietaire'            => 'nullable|string',
-            'date_commission_mixte'   => 'nullable|date',
-        ]);
+        'numero_dossier'          => ['required', 'regex:/^\d+\/\d{2}$/'], // <= ICI
+        'numero_arrivee'          => ['nullable', 'string', 'max:50'],
+        'province'                => 'required|string',
+        'commune_1'               => 'required|string',
+        'date_arrivee'            => 'required|date',
+        'petitionnaire'           => 'required|string',
+        'categorie_petitionnaire' => 'required|string',
+        'intitule_projet'         => 'required|string',
+        'categorie_projet'        => 'required|string|in:Commerce,Culte,Equipement de proximité,équipement public,équipement privé,Immeuble,projet agricole,Projet Industriel,Projet touristique,R+1,R+2,RDC,Services,Villa,Autre',
+        'contexte_projet'         => 'required|string',
+        'maitre_oeuvre'           => 'required|string',
+        'situation'               => 'required|string',
+        'reference_fonciere'      => 'required|string',
+        'reference_envoi'         => 'nullable|string',
+        'numero_envoi'            => 'nullable|string',
+        'lien_ged'                => 'nullable|url',
+        'observations'            => 'nullable|string',
+        'proprietaire'            => 'nullable|string',
+        'date_commission_mixte'   => 'nullable|date',
+    ]);
 
         $validated['type_envoi']  = $request->has('envoi_papier') ? 'papier' : 'email';
         $validated['type_projet'] = 'cpc';
@@ -153,7 +153,7 @@ class GrandProjetCPCController extends Controller
     public function update(Request $request, GrandProjet $grandProjet)
     {
         $validated = $request->validate([
-            'numero_dossier'          => ['required', 'regex:/^\d+\/20\d{2}$/'],
+            'numero_dossier'          => ['required', 'regex:/^\d+\/\d{2}$/'],
             'numero_arrivee'          => ['nullable', 'string', 'max:50'],
             'province'                => 'required|string',
             'commune_1'               => 'required|string',

@@ -39,16 +39,16 @@
             {{-- Numéro de Dossier --}}
             <div class="mb-3">
               <label class="form-label fw-semibold">Numéro de Dossier <span class="text-danger">*</span></label>
-              <input
-                type="text"
-                name="numero_dossier"
-                value="{{ old('numero_dossier') }}"
-                class="form-control"
-                placeholder="ex: 1234/2025"
-                data-validate='{"required":true,"pattern":"^\\d+\\/20\\d{2}$","message":"Format attendu : 1234/20XX"}'
-              >
-              <div class="invalid-feedback">Format attendu : <code>nombre/20XX</code> (ex. 452/2025)</div>
-              <div class="form-text">Format attendu : <code>nombre/20XX</code> (ex. 452/2025)</div>
+              <input type="text"
+       name="numero_dossier"
+       class="form-control @error('numero_dossier') is-invalid @enderror"
+       value="{{ old('numero_dossier', $grandProjet->numero_dossier ?? '') }}"
+       placeholder="ex: 1234/25"
+       pattern="\d+/\d{2}"
+       title="Format: nombre/AA, ex: 452/25"
+       required>
+              <div class="invalid-feedback">Format attendu : <code>nombre/XX</code> (ex. 452/25)</div>
+              <div class="form-text">Format attendu : <code>nombre/XX</code> (ex. 452/25)</div>
             </div>
 
             {{-- Préfecture / Province --}}
