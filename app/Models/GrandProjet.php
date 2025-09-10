@@ -45,7 +45,7 @@ class GrandProjet extends Model
         'bs_completed_at',
         'bs_completed_by',
         'assigned_dajf_id','assigned_dajf_at',
-    'assigned_dgu_id','assigned_dgu_at',
+    'assigned_dgu_id','assigned_dgu_at','superficie_morcelee','superficie_lotie','consistance',
     ];
 
     /* ===== Relations ===== */

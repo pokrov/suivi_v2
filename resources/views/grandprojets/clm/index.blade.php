@@ -2,6 +2,7 @@
 @extends('layouts.app')
 
 @section('content')
+@php use Illuminate\Support\Str; @endphp
 <div class="container">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h3 class="mb-0">CLM — Liste des dossiers</h3>
@@ -17,15 +18,15 @@
   </div>
 
   <style>
-    .chip-state{display:inline-flex;align-items:center;gap:.4rem;padding:.28rem .6rem;border-radius:999px;font-size:.78rem;font-weight:700;border:1px solid transparent;white-space:nowrap}
-    .chip-state .dot{width:8px;height:8px;border-radius:50%}
-    .chip-soft-secondary{background:#f5f6f8;color:#3a3f45;border-color:#e4e7eb}.chip-soft-secondary .dot{background:#6c757d}
+    .chip{display:inline-flex;align-items:center;gap:.4rem;padding:.28rem .6rem;border-radius:999px;
+          font-size:.78rem;font-weight:700;border:1px solid transparent;white-space:nowrap}
+    .chip .dot{width:8px;height:8px;border-radius:50%}
+
     .chip-soft-primary{background:#e7f1ff;color:#0b5ed7;border-color:#cfe2ff}.chip-soft-primary .dot{background:#0d6efd}
     .chip-soft-info{background:#e8f6fb;color:#117a8b;border-color:#cfeaf4}.chip-soft-info .dot{background:#0dcaf0}
-    .chip-soft-warning{background:#fff4e5;color:#b26a00;border-color:#ffe1bd}.chip-soft-warning .dot{background:#ffc107}
-    .chip-soft-dark{background:#eceef2;color:#20232a;border-color:#dadee5}.chip-soft-dark .dot{background:#343a40}
     .chip-soft-success{background:#e9f7ef;color:#1e7e34;border-color:#cfe9d9}.chip-soft-success .dot{background:#198754}
     .chip-soft-light{background:#f8f9fa;color:#495057;border-color:#e9ecef}.chip-soft-light .dot{background:#adb5bd}
+
     .row-defav-retourbs{background:#fdeaea!important}
     tr.clickable{cursor:pointer}
   </style>
@@ -37,6 +38,15 @@
       'signature_3'=>'3ᵉ signature','retour_bs'=>'Bureau de suivi','archive'=>'Archivé',
     ];
     $provinces = ['Préfecture Oujda-Angad','Province Berkane','Province Jerada','Province Taourirt','Province Figuig'];
+
+    // Petite fonction pour déduire le type CLM à partir de la catégorie
+    $detectType = function ($categorie) {
+      $s = Str::lower((string)$categorie);
+      if (Str::contains($s, ['morcel']))  return ['Morcellement','chip-soft-info'];
+      if (Str::contains($s, ['lotiss']))  return ['Lotissement','chip-soft-primary'];
+      if (Str::contains($s, ['groupe']))  return ['Groupe d’habitation','chip-soft-success'];
+      return ['Autre','chip-soft-light'];
+    };
   @endphp
 
   <form method="GET" class="card shadow-sm mb-3">
@@ -93,39 +103,32 @@
         <table class="table table-hover align-middle mb-0">
           <thead class="table-dark">
             <tr>
-              <th>#</th><th>N° Dossier</th><th>Intitulé</th><th>Commune</th><th>Province</th><th>État</th><th>Date arrivée</th><th class="text-end">Actions</th>
+              <!-- <th>#</th> -->
+              <th>N° Dossier</th>
+              <th>Intitulé</th>
+              <th>Commune</th>
+              <th>Province</th>
+              <th>Type CLM</th>
+              <th>Date arrivée</th>
+              <th class="text-end">Actions</th>
             </tr>
           </thead>
           <tbody>
             @foreach($grandProjets as $i => $item)
               @php
                 $isDefavorableRetourBS = optional($item->lastExamen)->avis === 'defavorable' && $item->etat === 'retour_bs';
-                $stateMap = [
-                  'transmis_dajf'=>['Saisie','chip-soft-secondary'],
-                  'recu_dajf'=>['Vers DAJF','chip-soft-primary'],
-                  'transmis_dgu'=>['DAJF','chip-soft-secondary'],
-                  'recu_dgu'=>['Vers DGU','chip-soft-primary'],
-                  'vers_comm_interne'=>['DGU','chip-soft-secondary'],
-                  'comm_interne'=>['Comm. Interne','chip-soft-primary'],
-                  'comm_mixte'=>['Comm. Mixte','chip-soft-info'],
-                  'signature_3'=>['3ᵉ signature','chip-soft-warning'],
-                  'retour_bs'=>['Bureau de suivi','chip-soft-dark'],
-                  'archive'=>['Archivé','chip-soft-success'],
-                ];
-                $meta = $stateMap[$item->etat] ?? [$item->etat,'chip-soft-light'];
-                $showUrl = Auth::user()->hasRole('chef')
-                  ? route('cpc.show.shared', $item) /* même page partagée */
-                  : route('clm.show.shared', $item);
+                [$typeLib,$typeClass] = $detectType($item->categorie_projet);
+                $showUrl = route('clm.show.shared', $item); // <- fiche partagée CLM
               @endphp
               <tr class="clickable {{ $isDefavorableRetourBS ? 'row-defav-retourbs' : '' }}"
                   onclick="window.location='{{ $showUrl }}'">
-                <td>{{ $grandProjets->firstItem() + $i }}</td>
-                <td><strong>{{ $item->numero_dossier }}</strong></td>
-                <td>{{ $item->intitule_projet }}</td>
+                <!-- <td>{{ $grandProjets->firstItem() + $i }}</td> -->
+                <td class="fw-semibold">{{ $item->numero_dossier }}</td>
+                <td class="text-truncate" style="max-width:340px">{{ $item->intitule_projet }}</td>
                 <td>{{ $item->commune_1 }}</td>
                 <td>{{ $item->province }}</td>
                 <td>
-                  <span class="chip-state {{ $meta[1] }}"><span class="dot"></span> {{ $meta[0] }}</span>
+                  <span class="chip {{ $typeClass }}"><span class="dot"></span> {{ $typeLib }}</span>
                 </td>
                 <td>{{ $item->date_arrivee ? \Carbon\Carbon::parse($item->date_arrivee)->format('d/m/Y') : '-' }}</td>
                 <td class="text-end">
