@@ -74,55 +74,62 @@ class GrandProjetCPCController extends Controller
     }
 
     public function store(Request $request)
-    {
-        $validated = $request->validate([
-        'numero_dossier'          => ['required', 'regex:/^\d+\/\d{2}$/'], // <= ICI
-        'numero_arrivee'          => ['nullable', 'string', 'max:50'],
-        'province'                => 'required|string',
-        'commune_1'               => 'required|string',
-        'date_arrivee'            => 'required|date',
-        'petitionnaire'           => 'required|string',
-        'categorie_petitionnaire' => 'required|string',
-        'intitule_projet'         => 'required|string',
-        'categorie_projet'        => 'required|string|in:Commerce,Culte,Equipement de proximité,équipement public,équipement privé,Immeuble,projet agricole,Projet Industriel,Projet touristique,R+1,R+2,RDC,Services,Villa,Autre',
-        'contexte_projet'         => 'required|string',
-        'maitre_oeuvre'           => 'required|string',
-        'situation'               => 'required|string',
-        'reference_fonciere'      => 'required|string',
-        'reference_envoi'         => 'nullable|string',
-        'numero_envoi'            => 'nullable|string',
-        'lien_ged'                => 'nullable|url',
-        'observations'            => 'nullable|string',
-        'proprietaire'            => 'nullable|string',
-        'date_commission_mixte'   => 'nullable|date',
+{
+    $data = $request->validate([
+        'numero_dossier'          => ['required','regex:/^\d+\/\d{2}$/'], // plus de unique
+        'province'                => ['required','string','max:120'],
+        'commune_1'               => ['required','string','max:120'],
+        'date_arrivee'            => ['required','date'],
+        'petitionnaire'           => ['required','string','max:180'],
+        'categorie_petitionnaire' => ['required','string','max:120'],
+        'intitule_projet'         => ['required','string','max:255'],
+        'maitre_oeuvre'           => ['required','string','max:180'],
+        'situation'               => ['required','string','max:500'],
+
+        // facultatifs
+        'commune_2'               => ['nullable','string','max:120'],
+        'reference_envoi'         => ['nullable','string','max:255'],
+        'numero_envoi'            => ['nullable','string','max:255'],
+        'numero_arrivee'          => ['nullable','string','max:255'],
+        'date_commission_mixte'   => ['nullable','date'],
+        'lien_ged'                => ['nullable','url','max:255'],
+        'reference_fonciere'      => ['nullable','string','max:255'],
+        'observations'            => ['nullable','string'],
+        'proprietaire'            => ['nullable','string','max:180'],
+        'categorie_projet'        => ['required','string','max:120'],
+        'contexte_projet'         => ['nullable','string','max:120'],
+        'envoi_papier'            => ['nullable','boolean'],
     ]);
 
-        $validated['type_envoi']  = $request->has('envoi_papier') ? 'papier' : 'email';
-        $validated['type_projet'] = 'cpc';
-        $validated['user_id']     = Auth::id();
+    // Normalisation
+    $data['type_projet']  = 'cpc';
+    $data['etat']         = 'enregistrement';
+    $data['user_id']      = auth()->id();
+    $data['envoi_papier'] = $request->boolean('envoi_papier');
 
-        // ✅ Etat initial demandé : transmis_dajf
-        $validated['etat']        = 'enregistrement';
-
-        $gp = GrandProjet::create($validated);
-
-        // Journal initial
-        FluxEtape::create([
-            'grand_projet_id' => $gp->id,
-            'from_etat'       => '—',
-            'to_etat'         => 'transmis_dajf',
-            'happened_at'     => $gp->created_at,
-            'by_user'         => auth()->id(),
-            'note'            => 'Création (transmis à la DAJF)',
-        ]);
-
-        if (Auth::user()->hasRole('chef')) {
-            return redirect()->route('chef.grandprojets.cpc.index')->with('success', 'Projet CPC enregistré.');
-        } elseif (Auth::user()->hasRole('saisie_cpc')) {
-            return redirect()->route('saisie_cpc.dashboard')->with('success', 'Projet CPC enregistré.');
-        }
-        return redirect()->route('login');
+    // Champs optionnels = null si vide (si colonnes NOT NULL en base, adapte)
+    foreach (['commune_2','reference_envoi','numero_envoi','numero_arrivee','date_commission_mixte','lien_ged','reference_fonciere','observations','proprietaire','contexte_projet'] as $k) {
+        if (!($data[$k] ?? null)) $data[$k] = null;
     }
+
+    // --- Réutiliser la fiche si elle existe
+    $existing = \App\Models\GrandProjet::where('type_projet','cpc')
+        ->where('numero_dossier',$data['numero_dossier'])
+        ->first();
+
+    if ($existing) {
+        $existing->fill($data);
+        $existing->save();
+        $gp = $existing;
+    } else {
+        $gp = \App\Models\GrandProjet::create($data);
+    }
+
+    return redirect()
+        ->route('chef.grandprojets.cpc.show', $gp) // adapte si route autre quand saisie_cpc
+        ->with('success', 'Dossier CPC enregistré.');
+}
+
 
     public function show(GrandProjet $grandProjet)
     {

@@ -615,6 +615,47 @@ Route::middleware(['auth','role:comm_interne'])
         Route::post('/clm/{grandProjet}/marquer-signe',      [CommissionActionsController::class, 'markSigned'])->name('clm.markSigned');
         Route::post('/clm/{grandProjet}/archiver',           [CommissionActionsController::class, 'archive'])->name('clm.archive');
     });
+Route::middleware('auth')->get('/ajax/lookup-dossier', function (Request $request) {
+    $type   = $request->query('type', 'cpc');           // 'cpc' | 'clm'
+    $numero = trim($request->query('numero_dossier', ''));
+
+    if ($numero === '') {
+        return response()->json(['ok' => false, 'msg' => 'numero_dossier manquant'], 422);
+    }
+
+    $gp = GrandProjet::where('type_projet', $type)
+        ->where('numero_dossier', $numero)
+        ->with(['lastExamen', 'examens'])
+        ->latest('id')
+        ->first();
+
+    if (!$gp) {
+        return response()->json(['ok' => true, 'exists' => false]);
+    }
+
+    $examCount   = (int) ($gp->examens->max('numero_examen') ?? 0);
+    $nextExamen  = $examCount + 1;
+    $lastAvis    = optional($gp->lastExamen)->avis;
+
+    // Champs à pré-remplir côté formulaire
+    $prefill = $gp->only([
+        'numero_dossier','province','commune_1','commune_2','date_arrivee','numero_arrivee',
+        'petitionnaire','proprietaire','categorie_petitionnaire','intitule_projet',
+        'maitre_oeuvre','situation','reference_fonciere','reference_envoi','numero_envoi',
+        'date_commission_mixte','lien_ged','categorie_projet','contexte_projet','observations'
+    ]);
+
+    return response()->json([
+        'ok'           => true,
+        'exists'       => true,
+        'etat'         => $gp->etat,
+        'last_avis'    => $lastAvis,            // favorable | defavorable | null
+        'exam_count'   => $examCount,
+        'next_examen'  => $nextExamen,
+        'prefill'      => $prefill,
+        'gp_id'        => $gp->id,
+    ]);
+})->name('ajax.lookup.dossier');
 
 /* =========================================================
    FICHES PARTAGÉES (Lecture seule multi-rôles)
