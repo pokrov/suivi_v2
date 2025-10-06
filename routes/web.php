@@ -15,6 +15,8 @@ use App\Http\Controllers\ExamenController;
 use App\Http\Controllers\CommissionActionsController;
 use App\Http\Controllers\StatsController;
 use App\Http\Controllers\ChefAssignmentController;
+use App\Http\Controllers\PetitProjetController;
+
 Auth::routes();
 
 /* ===== REDIRECT RACINE / HOME ===== */
@@ -75,7 +77,7 @@ Route::middleware(['auth', 'role:super_admin'])
     });
 
 /* =========================================================
-   CHEF (DASHBOARD + GRAND PROJETS CPC & CLM + assignments)
+   CHEF (DASHBOARD + GRAND PROJETS CPC & CLM + assignments + PETITS PROJETS)
 ========================================================= */
 Route::middleware(['auth', 'role:chef'])
     ->prefix('chef')->name('chef.')->group(function () {
@@ -84,10 +86,15 @@ Route::middleware(['auth', 'role:chef'])
         Route::get('/dashboard', fn () => view('chef.dashboard'))->name('dashboard');
         Route::get('/stats', [StatsController::class, 'index'])->name('stats.index');
 
+        /* ----- PETITS PROJETS ----- */
+        Route::resource('petitprojets', PetitProjetController::class)
+            ->names('petitprojets')
+            ->parameters(['petitprojets' => 'petitprojet']);
+
         /* ----- assignments ----- */
         // Alias pour compatibilité avec l’ancienne navbar
-Route::get('/assignments', [ChefAssignmentController::class, 'index'])
-    ->name('assignments.index');
+        Route::get('/assignments', [ChefAssignmentController::class, 'index'])
+            ->name('assignments.index');
 
         Route::post('/assignments/{grandProjet}/dajf', [ChefAssignmentController::class, 'assignToDajf'])
             ->name('assignments.assign.dajf');
@@ -121,6 +128,7 @@ Route::get('/assignments', [ChefAssignmentController::class, 'index'])
             Route::put ('clm/{grandProjet}/complete', [GrandProjetCLMController::class, 'completeStore'])->name('clm.complete.store');
         });
     });
+
 
 
 /* =========================================================

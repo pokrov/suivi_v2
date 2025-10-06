@@ -27,19 +27,22 @@
   </div>
 
   <div class="row g-4">
-    {{-- Petit Projet (placeholder) --}}
-    <div class="col-md-4">
-      <div class="tile">
-        <div class="text-center mb-3">
-          <i class="fas fa-home fa-3x text-success"></i>
-        </div>
-        <h5 class="text-center mb-1">Petit Projet</h5>
-        <p class="lead text-center mb-3">Gérez tous les petits projets.</p>
-        <div class="d-grid">
-          <a href="#" class="btn btn-success big-btn" aria-disabled="true">Accéder</a>
-        </div>
-      </div>
+    {{-- Petit Projet --}}
+<div class="col-md-4">
+  <div class="tile">
+    <div class="text-center mb-3">
+      <i class="fas fa-home fa-3x text-success"></i>
     </div>
+    <h5 class="text-center mb-1">Petit Projet</h5>
+    <p class="lead text-center mb-3">Gérez tous les petits projets.</p>
+    <div class="d-grid">
+      <a href="{{ route('chef.petitprojets.index') }}" class="btn btn-success big-btn">
+        <i class="fas fa-list-ul me-1"></i> Accéder
+      </a>
+    </div>
+  </div>
+</div>
+
 
     {{-- Grand Projet --}}
     <div class="col-md-4">

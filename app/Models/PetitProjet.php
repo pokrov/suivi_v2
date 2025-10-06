@@ -1,7 +1,5 @@
 <?php
 
-
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,45 +9,63 @@ class PetitProjet extends Model
 {
     use HasFactory;
 
-    protected $table = 'petits_projets';
-
     protected $fillable = [
-        'numero_projet',
-        'titre_projet',
+        // Identification / localisation
+        'numero_dossier',
         'province',
-        'commune',
-        'commission_numero',
-        'commission_annee',
-        'avis_commission',
-        'numero_avis_favorable',
-        'motivation_avis',
-        'observations',
+        'commune_1',
+        'commune_2',
+
+        // Arrivée / registre
+        'date_arrivee',
+        'numero_arrivee',
+
+        // Pétitionnaire / MO
         'petitionnaire',
+        'a_proprietaire',     // bool
+        'proprietaire',
         'categorie_petitionnaire',
-        'categorie_projet',
-        'contexte',
         'maitre_oeuvre',
+
+        // Projet
+        'intitule_projet',
+        'categorie_projet',   // array (JSON)
+        'contexte_projet',
         'situation',
         'reference_fonciere',
-        'surface_terrain',
-        'surface_batie',
+        'lien_ged',
+        'observations',
+
+        // Surfaces / indicateurs (facultatifs, souvent utiles)
+        'superficie_terrain',
+        'superficie_couverte',
         'montant_investissement',
-        'nombre_logements',
-        'plan_url',
-        'commission_esthetique',
-        'numero_classement',
-        'statut',
-        'user_id',
+        'emplois_prevus',
+        'nb_logements',
+
+        // ROKHAS (avis saisi sur le champ)
+        'rokhas_numero',          // ex: N° de la DP/PC dans Rokhas
+        'rokhas_lien',            // lien direct (si utile)
+        'rokhas_avis',            // favorable | defavorable | sous_reserve | sans_objet
+        'rokhas_avis_date',
+        'rokhas_avis_commentaire',
+        'rokhas_piece_url',       // lien vers pièce jointe (pdf) si stockée ailleurs
+
+        // Divers
+        'user_id',                // créateur
+        'etat',                   // 'enregistrement' | 'archive' (simple)
     ];
 
-    // Pour convertir le champ JSON en tableau
     protected $casts = [
-        'commission_esthetique' => 'array',
+        'categorie_projet'   => 'array',
+        'a_proprietaire'     => 'boolean',
+         'date_arrivee'     => 'date',
+        'rokhas_avis_date'   => 'date',
     ];
 
-    // Relation avec l'utilisateur qui a créé le projet
-    public function user()
-    {
-        return $this->belongsTo(User::class);
-    }
+    /* ===== Relations ===== */
+    public function user() { return $this->belongsTo(\App\Models\User::class); }
+
+    /* ===== Helpers ===== */
+    public function isArchived(): bool { return $this->etat === 'archive'; }
 }
